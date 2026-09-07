@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Hub</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-secondary:#f7f6f3;
+    --bg-tertiary:#eeece7;
+    --border:#e4e1da;
+    --text:#37352f;
+    --text-secondary:#787369;
+    --text-faint:#a8a29a;
+    --accent:#5b5bd6;
+    --accent-hover:#4747c2;
+    --accent-soft:#ecebfb;
+    --green:#2f9e6e;
+    --green-soft:#e4f5ee;
+    --red:#e35d5d;
+    --red-soft:#fbe9e9;
+    --amber:#d9a441;
+    --shadow: 0 1px 2px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.06);
+    --radius:8px;
+    --font-ui:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  body.dark-mode{
+    --bg:#191919;
+    --bg-secondary:#202020;
+    --bg-tertiary:#2a2a2a;
+    --border:#333333;
+    --text:#e9e6e0;
+    --text-secondary:#9b9691;
+    --text-faint:#6b6560;
+    --accent:#8585f0;
+    --accent-hover:#9d9df5;
+    --accent-soft:#2a2a45;
+    --green:#4fbf8f;
+    --green-soft:#173328;
+    --red:#e88080;
+    --red-soft:#3a2323;
+    --amber:#e0b662;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.4);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:var(--font-ui); background:var(--bg); color:var(--text);
+    height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased;
+    transition: background-color .25s ease, color .25s ease;
+  }
+  body, .topbar, .sidebar, .main, .modal, .quiz-overlay, .quiz-stimulus, .quiz-option,
+  table, td, th, .subject-item, .icon-btn, .btn, .search, .select-input, .text-input,
+  .field textarea, .field input, .tagselect, .pill, .type-badge, .bottom-sheet, .tagdrop-panel{
+    transition: background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
+  @keyframes fadeScaleIn{ from{opacity:0; transform:translateY(6px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);} }
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  button{font-family:inherit; cursor:pointer;}
+  input, select, textarea{font-family:inherit; color:inherit;}
+  ::selection{background:var(--accent-soft);}
+
+  /* ---- Layout ---- */
+  .app{display:flex; flex-direction:column; height:100vh;}
+  .topbar{
+    display:flex; align-items:center; gap:16px; padding:0 18px; height:52px; flex-shrink:0;
+    border-bottom:1px solid var(--border); background:var(--bg);
+  }
+  .topbar .logo{display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; letter-spacing:-.2px;}
+  .topbar .logo i{color:var(--accent);}
+  .topbar .search{
+    flex:1; max-width:420px; margin:0 auto; display:flex; align-items:center; gap:8px;
+    background:var(--bg-secondary); border:1px solid var(--border); border-radius:6px; padding:6px 10px;
+  }
+  .topbar .search input{border:none; outline:none; background:transparent; width:100%; font-size:13px; color:var(--text);}
+  .topbar .search i{color:var(--text-faint); font-size:12px;}
+  .topbar-actions{display:flex; align-items:center; gap:4px;}
+  .icon-btn{
+    display:flex; align-items:center; justify-content:center; gap:6px; width:34px; height:34px; border-radius:6px;
+    border:none; background:transparent; color:var(--text-secondary); font-size:14px; transition:background .12s;
+  }
+  .icon-btn:hover{background:var(--bg-tertiary); color:var(--text);}
+  .icon-btn.wide{width:auto; padding:0 12px; font-size:13px; font-weight:500;}
+  .icon-btn.primary{background:var(--accent); color:#fff;}
+  .icon-btn.primary:hover{background:var(--accent-hover);}
+
+  .body-row{flex:1; display:flex; min-height:0;}
+  .sidebar{
+    width:220px; flex-shrink:0; border-right:1px solid var(--border); background:var(--bg-secondary);
+    display:flex; flex-direction:column; padding:10px 8px;
+  }
+  .sidebar-title{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-faint); padding:8px 8px 4px;}
+  .subject-list{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:1px;}
+  .subject-item{
+    display:flex; align-items:center; justify-content:space-between; gap:6px; padding:7px 8px; border-radius:6px;
+    font-size:13.5px; color:var(--text-secondary); cursor:pointer;
+  }
+  .subject-item span.name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .subject-item:hover{background:var(--bg-tertiary);}
+  .subject-item.active{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+  .subject-item .del{opacity:0; font-size:11px; color:var(--text-faint);}
+  .subject-item:hover .del{opacity:1;}
+  .subject-item .del:hover{color:var(--red);}
+  .add-subject-btn{
+    display:flex; align-items:center; gap:8px; padding:8px; border-radius:6px; border:none; background:transparent;
+    color:var(--text-faint); font-size:13px; margin-top:4px;
+  }
+  .add-subject-btn:hover{background:var(--bg-tertiary); color:var(--text-secondary);}
+
+  .main{flex:1; overflow-y:auto; padding:24px 32px; min-width:0;}
+  .empty-state{display:flex; flex-direction:column; align-items:center; justify-content:center; height:70%; color:var(--text-faint); gap:10px; text-align:center;}
+  .empty-state i{font-size:32px; color:var(--text-faint);}
+
+  .subject-header{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:10px;}
+  .subject-header h1{font-size:22px; margin:0; font-weight:700; letter-spacing:-.3px;}
+  .subject-meta{color:var(--text-faint); font-size:12.5px; margin-bottom:18px;}
+  .tabs{display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:16px;}
+  .tab-btn{padding:8px 4px; margin-right:18px; background:none; border:none; font-size:13.5px; color:var(--text-faint); border-bottom:2px solid transparent; font-weight:500;}
+  .tab-btn.active{color:var(--text); border-bottom-color:var(--accent);}
+
+  .toolbar{display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+  .select-input, .text-input{
+    padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px;
+  }
+  .btn{
+    padding:7px 14px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);
+    font-size:13px; font-weight:500; display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{background:var(--bg-tertiary);}
+  .btn.danger{color:var(--red); border-color:var(--red-soft);}
+  .btn.danger:hover{background:var(--red-soft);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .btn.primary:hover{background:var(--accent-hover);}
+  .btn.ghost{border-color:transparent; background:transparent;}
+  .btn.ghost:hover{background:var(--bg-tertiary);}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  thead th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint);
+    font-weight:600; padding:8px 10px; border-bottom:1px solid var(--border);
+  }
+  tbody td{padding:10px; border-bottom:1px solid var(--border); vertical-align:top;}
+  tbody tr:hover{background:var(--bg-secondary);}
+  .qprev{max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pill{display:inline-block; padding:2px 8px; border-radius:100px; background:var(--accent-soft); color:var(--accent); font-size:11px; margin:0 4px 4px 0; font-weight:500;}
+  .type-badge{font-size:11px; padding:2px 7px; border-radius:5px; font-weight:600;}
+  .type-badge.single{background:var(--bg-tertiary); color:var(--text-secondary);}
+  .type-badge.group{background:var(--accent-soft); color:var(--accent);}
+  button.type-badge{border:none; cursor:pointer; font-family:inherit;}
+  button.type-badge.group:hover{background:var(--accent); color:#fff;}
+  .row-actions{display:flex; gap:4px;}
+  .row-actions button{border:none; background:transparent; color:var(--text-faint); width:26px; height:26px; border-radius:5px;}
+  .row-actions button:hover{background:var(--bg-tertiary); color:var(--text);}
+  .row-actions button.del-action:hover{color:var(--red);}
+  .pct-good{color:var(--green); font-weight:600;}
+  .pct-bad{color:var(--red); font-weight:600;}
+  .pct-mid{color:var(--amber); font-weight:600;}
+
+  /* ---- Stats: overview strip ---- */
+  .stat-strip{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;}
+  .stat-card{
+    flex:1; min-width:130px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px;
+  }
+  .stat-card .stat-value{font-size:24px; font-weight:800; letter-spacing:-.4px; line-height:1.2;}
+  .stat-card .stat-label{font-size:11.5px; color:var(--text-faint); margin-top:2px; font-weight:500;}
+
+  /* ---- Stats: mastery breakdown ---- */
+  .stats-section-title{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); margin:0 0 10px;}
+  .mastery-block{margin-bottom:22px;}
+  .mastery-bar{display:flex; height:14px; border-radius:100px; overflow:hidden; background:var(--bg-tertiary); margin-bottom:10px;}
+  .mastery-seg{height:100%; transition:width .3s ease;}
+  .mastery-seg.notstarted{background:var(--text-faint);}
+  .mastery-seg.needswork{background:var(--red);}
+  .mastery-seg.gettingthere{background:var(--amber);}
+  .mastery-seg.mastered{background:var(--green);}
+  .mastery-legend{display:flex; gap:18px; flex-wrap:wrap; font-size:12.5px; color:var(--text-secondary);}
+  .mastery-legend .dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle;}
+  .mastery-legend .dot.notstarted{background:var(--text-faint);}
+  .mastery-legend .dot.needswork{background:var(--red);}
+  .mastery-legend .dot.gettingthere{background:var(--amber);}
+  .mastery-legend .dot.mastered{background:var(--green);}
+
+  /* ---- Stats: sortable table headers ---- */
+  th.sortable{cursor:pointer; user-select:none;}
+  th.sortable:hover{color:var(--text);}
+  th.sortable .sort-arrow{margin-left:4px; opacity:.5; font-size:9px;}
+  th.sortable.active .sort-arrow{opacity:1; color:var(--accent);}
+
+  /* ---- Modal ---- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(20,18,14,0.45); display:flex; align-items:center; justify-content:center;
+    z-index:100; padding:20px; animation:fadeIn .18s ease;
+  }
+  .modal{
+    background:var(--bg); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto;
+    box-shadow:var(--shadow); border:1px solid var(--border); animation:fadeScaleIn .2s ease;
+  }
+  .modal.wide{max-width:760px;}
+  .modal-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:2;}
+  .modal-head h3{margin:0; font-size:15px; font-weight:700;}
+  .modal-head button{border:none; background:transparent; color:var(--text-faint); font-size:16px; width:28px; height:28px; border-radius:6px;}
+  .modal-head button:hover{background:var(--bg-tertiary);}
+  .modal-body{padding:18px 20px;}
+  .modal-foot{display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--bg);}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:5px;}
+  .field textarea, .field input[type=text], .field input[type=number]{
+    width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); font-size:13.5px; resize:vertical;
+  }
+  .field textarea{min-height:64px;}
+  .option-row{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .option-row input[type=radio]{accent-color:var(--accent); flex-shrink:0;}
+  .option-row input[type=text]{flex:1;}
+  .option-row .rm-opt{border:none; background:transparent; color:var(--text-faint); width:26px; height:26px; border-radius:5px; flex-shrink:0;}
+  .option-row .rm-opt:hover{color:var(--red); background:var(--red-soft);}
+  .hint{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+  .radio-row{display:flex; gap:16px; align-items:center;}
+  .radio-row label{display:flex; align-items:center; gap:6px; font-size:13px; font-weight:500; color:var(--text);}
+
+  .tagselect{display:flex; flex-wrap:wrap; gap:6px; padding:8px; border:1px solid var(--border); border-radius:6px; max-height:120px; overflow-y:auto;}
+  .tagselect label{display:flex; align-items:center; gap:5px; font-size:12.5px; background:var(--bg-secondary); padding:3px 8px; border-radius:100px;}
+  .tagselect input{accent-color:var(--accent);}
+
+  /* ---- Tag dropdown (checkbox multiselect) ---- */
+  .tagdrop{position:relative;}
+  .tagdrop-btn{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px;
+    border-radius:6px; border:1px solid var(--border); background:var(--bg); font-size:13px; color:var(--text); text-align:left;
+  }
+  .tagdrop-btn:hover{border-color:var(--accent);}
+  .tagdrop-btn .preview{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary);}
+  .tagdrop-btn .preview.has-selection{color:var(--text); font-weight:500;}
+  .tagdrop-panel{
+    position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--bg); border:1px solid var(--border);
+    border-radius:8px; box-shadow:var(--shadow); padding:8px; z-index:20;
+    animation:fadeScaleIn .15s ease; display:flex; flex-direction:column; gap:6px;
+  }
+  .tagdrop-panel label{display:flex; align-items:center; gap:8px; font-size:13px; padding:6px 6px; border-radius:5px;}
+  .tagdrop-panel label:hover{background:var(--bg-secondary);}
+  .tagdrop-panel input{accent-color:var(--accent);}
+  .tagdrop-search{
+    width:100%; padding:7px 9px; border-radius:6px; border:1px solid var(--border); background:var(--bg-secondary);
+    font-size:12.5px; color:var(--text);
+  }
+  .tagdrop-search:focus{outline:none; border-color:var(--accent);}
+  .tagdrop-list{max-height:180px; overflow-y:auto;}
+
+  /* ---- Toast ---- */
+  .toast-wrap{position:fixed; bottom:20px; right:20px; display:flex; flex-direction:column; gap:8px; z-index:300;}
+  .toast{
+    background:var(--text); color:var(--bg); padding:10px 16px; border-radius:8px; font-size:13px; box-shadow:var(--shadow);
+    max-width:340px; animation:slideup .18s ease;
+  }
+  .toast.error{background:var(--red);}
+  .toast.success{background:var(--green);}
+  @keyframes slideup{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+
+  /* ---- Quiz Overlay ---- */
+  .quiz-overlay{position:fixed; inset:0; background:var(--bg); z-index:200; display:flex; flex-direction:column; animation:fadeIn .2s ease;}
+  .quiz-top{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    padding:14px clamp(16px,5vw,24px); border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .quiz-progress{font-size:13px; font-weight:600; color:var(--text-secondary);}
+  .quiz-progress-bar{height:4px; background:var(--bg-tertiary); border-radius:2px; overflow:hidden; width:200px; max-width:40vw; margin-top:6px;}
+  .quiz-progress-bar-fill{height:100%; background:var(--accent); transition:width .2s;}
+  .quiz-content{
+    flex:1; overflow-y:auto; overflow-x:hidden; display:flex; justify-content:center; align-items:center;
+    padding:36px clamp(16px,5vw,24px); box-sizing:border-box;
+  }
+  .quiz-inner{width:100%; max-width:760px; margin:auto; box-sizing:border-box;}
+  .quiz-split{display:flex; gap:28px; max-width:960px; width:100%; align-items:center; margin:auto; box-sizing:border-box;}
+  .quiz-fade{animation:fadeUp .15s ease;}
+  .quiz-stimulus{
+    flex:0 0 38%; min-width:0; background:var(--bg-secondary); border-radius:10px; padding:20px; font-size:14px; line-height:1.65;
+    border:1px solid var(--border); max-height:60vh; overflow-y:auto; overflow-x:auto; align-self:center; box-sizing:border-box;
+  }
+  .quiz-qside{flex:1; min-width:0; align-self:center;}
+  .quiz-question{font-size:17px; font-weight:600; line-height:1.5; margin-bottom:20px; overflow-wrap:break-word;}
+  @media (max-width: 680px){
+    .quiz-split{flex-direction:column; align-items:stretch; gap:18px;}
+    .quiz-stimulus{flex:0 0 auto; width:100%; max-height:32vh;}
+  }
+  code{
+    font-family:var(--font-mono); font-size:.9em; background:var(--bg-tertiary); color:var(--text);
+    padding:1px 5px; border-radius:4px; border:1px solid var(--border);
+  }
+  pre{
+    font-family:var(--font-mono); font-size:12.5px; background:var(--bg-tertiary); border:1px solid var(--border);
+    border-radius:8px; padding:12px 14px; overflow-x:auto; margin:10px 0; line-height:1.55;
+  }
+  pre code{background:none; border:none; padding:0; font-size:inherit;}
+  .rq-stimulus pre, .rq-stimulus code, .quiz-stimulus pre, .quiz-stimulus code{font-size:12px;}
+  .quiz-option{
+    display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border:1px solid var(--border); border-radius:8px;
+    margin-bottom:8px; font-size:14px; line-height:1.5; transition:border-color .12s, background .12s; overflow-wrap:break-word;
+  }
+  .quiz-option:hover{border-color:var(--accent);}
+  .quiz-option.selected{border-color:var(--accent); background:var(--accent-soft);}
+  .quiz-option.correct{border-color:var(--green); background:var(--green-soft);}
+  .quiz-option.incorrect{border-color:var(--red); background:var(--red-soft);}
+  .quiz-option .marker{
+    width:18px; height:18px; border-radius:50%; border:2px solid var(--border); flex-shrink:0; margin-top:1px;
+  }
+  .quiz-option.selected .marker{border-color:var(--accent); background:var(--accent);}
+  .quiz-option.correct .marker{border-color:var(--green); background:var(--green);}
+  .quiz-option.incorrect .marker{border-color:var(--red); background:var(--red);}
+  .quiz-option .opt-key{
+    margin-left:auto; flex-shrink:0; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint);
+    border:1px solid var(--border); border-radius:4px; padding:1px 6px; align-self:center;
+  }
+  .quiz-actions{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:22px;}
+  .key-hint{
+    font-family:var(--font-mono); font-size:10px; opacity:.75; margin-left:6px; padding:1px 5px; border:1px solid currentColor; border-radius:3px;
+  }
+  .quiz-feedback{font-size:13px; font-weight:600; margin-top:14px; animation:fadeIn .2s ease;}
+  .quiz-feedback.correct{color:var(--green);}
+  .quiz-feedback.incorrect{color:var(--red);}
+
+  .end-screen{display:flex; flex-direction:column; align-items:center; text-align:center; gap:14px; padding-top:40px; animation:fadeUp .22s ease;}
+  .end-score{font-size:48px; font-weight:800; color:var(--accent);}
+  .review-list{width:100%; max-width:720px; margin:0 auto; text-align:left; display:flex; flex-direction:column; gap:14px;}
+  .review-item{border:1px solid var(--border); border-radius:10px; padding:16px 18px; animation:fadeUp .18s ease;}
+  .review-item .rq-stimulus{background:var(--bg-secondary); border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:10px; color:var(--text-secondary);}
+  .review-item .rq-text{font-weight:600; font-size:14.5px; margin-bottom:10px; line-height:1.5;}
+  .review-item .rq-ans{font-size:13px; margin-bottom:4px; line-height:1.5;}
+  .review-item .rq-ans .lbl{color:var(--text-faint); font-weight:600; margin-right:4px;}
+  .review-item .rq-ans.wrong{color:var(--red);}
+  .review-item .rq-ans.right{color:var(--green);}
+
+  /* ---- Bottom sheet ---- */
+  .bottom-sheet{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:var(--text); color:var(--bg);
+    padding:14px 18px; border-radius:10px; display:flex; align-items:center; gap:16px; box-shadow:var(--shadow); z-index:250;
+    animation:slideup .2s ease;
+  }
+  .bottom-sheet button{border:none; padding:7px 14px; border-radius:6px; font-size:12.5px; font-weight:600;}
+  .bottom-sheet .resume-btn{background:var(--accent); color:#fff;}
+  .bottom-sheet .discard-btn{background:transparent; color:var(--bg); opacity:.7;}
+
+  ::-webkit-scrollbar{width:9px; height:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--border); border-radius:5px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="logo"><i class="fa-solid fa-layer-group"></i> Quiz Hub</div>
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="searchInput" placeholder="Search questions..."></div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btnImport" title="Import"><i class="fa-solid fa-file-import"></i></button>
+      <button class="icon-btn" id="btnExport" title="Export Quiz Pack"><i class="fa-solid fa-file-export"></i></button>
+      <button class="icon-btn" id="btnImportBackup" title="Import Quiz Pack"><i class="fa-solid fa-upload"></i></button>
+      <button class="icon-btn wide primary" id="btnGenerate"><i class="fa-solid fa-rocket"></i> Generate Quiz</button>
+      <button class="icon-btn" id="btnShortcuts" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
+      <button class="icon-btn" id="btnDark" title="Toggle dark mode"><i class="fa-solid fa-moon"></i></button>
+    </div>
+  </div>
+
+  <div class="body-row">
+    <div class="sidebar">
+      <div class="sidebar-title">Subjects</div>
+      <div class="subject-list" id="subjectList"></div>
+      <button class="add-subject-btn" id="btnAddSubject"><i class="fa-solid fa-plus"></i> Add Subject</button>
+    </div>
+    <div class="main" id="mainArea"></div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+<div id="modalRoot"></div>
+<div id="sheetRoot"></div>
+<input type="file" id="backupFileInput" accept=".json" style="display:none">
+
+<script>
+/* ============================= STATE ============================= */
+const STORAGE_KEY = 'quizHubData';
+const SESSION_KEY = 'ongoingQuiz';
+const ACTIVE_SUBJECT_KEY = 'quizHubActiveSubject';
+let state = loadState();
+let activeSubjectId = restoreActiveSubjectId();
+let activeTab = 'bank'; // 'bank' | 'stats'
+let bankTagFilter = new Set();
+let searchQuery = '';
+
+function restoreActiveSubjectId(){
+  const saved = localStorage.getItem(ACTIVE_SUBJECT_KEY);
+  if(saved && state.subjects[saved]) return saved;
+  return Object.keys(state.subjects)[0] || null;
+}
+function setActiveSubject(id){
+  activeSubjectId = id;
+  if(id) localStorage.setItem(ACTIVE_SUBJECT_KEY, id);
+  else localStorage.removeItem(ACTIVE_SUBJECT_KEY);
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){ console.error('Failed to load state', e); }
+  return { subjects: {}, version: '1.0' };
+}
+function saveState(){
+  try{
+    const json = JSON.stringify(state);
+    const sizeMB = new Blob([json]).size / (1024*1024);
+    if(sizeMB > 4){ toast('Warning: data size is ' + sizeMB.toFixed(1) + 'MB, approaching localStorage limits.', 'error'); }
+    localStorage.setItem(STORAGE_KEY, json);
+  }catch(e){
+    toast('Failed to save data: ' + e.message, 'error');
+  }
+}
+function uid(prefix){ return prefix + '-' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+function touchSubject(subjectId){
+  const s = state.subjects[subjectId];
+  if(s) s.updatedAt = new Date().toISOString();
+}
+
+/* ============================= TOAST ============================= */
+function toast(msg, type=''){
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type?(' '+type):'');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 3600);
+}
+
+/* ============================= DARK MODE ============================= */
+function initDarkMode(){
+  const pref = localStorage.getItem('quizHubDarkMode');
+  if(pref === 'true') document.body.classList.add('dark-mode');
+  updateDarkIcon();
+}
+function toggleDarkMode(){
+  document.body.classList.toggle('dark-mode');
+  localStorage.setItem('quizHubDarkMode', document.body.classList.contains('dark-mode'));
+  updateDarkIcon();
+}
+function updateDarkIcon(){
+  const icon = document.querySelector('#btnDark i');
+  icon.className = document.body.classList.contains('dark-mode') ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+}
+
+/* ============================= KATEX RENDER ============================= */
+function renderMath(container){
+  if(window.renderMathInElement){
+    try{
+      renderMathInElement(container, {
+        delimiters: [
+          {left:'\\[', right:'\\]', display:true},
+          {left:'\\(', right:'\\)', display:false}
+        ],
+        throwOnError:false
+      });
+    }catch(e){}
+  }
+}
+
+/* ============================= SIDEBAR ============================= */
+function renderSidebar(){
+  const list = document.getElementById('subjectList');
+  const subjects = Object.values(state.subjects);
+  if(subjects.length === 0){
+    list.innerHTML = '<div style="padding:10px 8px; font-size:12.5px; color:var(--text-faint);">No subjects yet</div>';
+    return;
+  }
+  list.innerHTML = subjects.map(s => `
+    <div class="subject-item ${s.id===activeSubjectId?'active':''}" data-id="${s.id}">
+      <span class="name">${escapeHtml(s.name)}</span>
+      <i class="fa-solid fa-trash del" data-del="${s.id}"></i>
+    </div>
+  `).join('');
+  list.querySelectorAll('.subject-item').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      if(e.target.dataset.del) return;
+      setActiveSubject(el.dataset.id);
+      bankTagFilter = new Set();
+      searchQuery = '';
+      document.getElementById('searchInput').value = '';
+      activeTab = 'bank';
+      renderAll();
+    });
+  });
+  list.querySelectorAll('[data-del]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      confirmModal(`Delete "${state.subjects[el.dataset.del].name}" and all its questions? This cannot be undone.`, ()=>{
+        delete state.subjects[el.dataset.del];
+        if(activeSubjectId === el.dataset.del){
+          setActiveSubject(Object.keys(state.subjects)[0] || null);
+        }
+        saveState(); renderAll();
+      });
+    });
+  });
+}
+
+/* ============================= MAIN AREA ============================= */
+function renderAll(){
+  renderSidebar();
+  renderMain();
+}
+function renderMain(){
+  const main = document.getElementById('mainArea');
+  const subject = activeSubjectId ? state.subjects[activeSubjectId] : null;
+  if(!subject){
+    main.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i><div>No subject selected.<br>Add a subject to get started.</div></div>`;
+    return;
+  }
+  const allTags = getAllTags(subject);
+  main.innerHTML = `
+    <div class="subject-header">
+      <h1>${escapeHtml(subject.name)}</h1>
+    </div>
+    <div class="subject-meta">${subject.questions.length} question${subject.questions.length!==1?'s':''}</div>
+    <div class="tabs">
+      <button class="tab-btn ${activeTab==='bank'?'active':''}" data-tab="bank">Bank</button>
+      <button class="tab-btn ${activeTab==='stats'?'active':''}" data-tab="stats">Statistics</button>
+    </div>
+    <div id="tabContent"></div>
+  `;
+  main.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>{
+    activeTab = b.dataset.tab; renderMain();
+  }));
+  if(activeTab === 'bank') renderBankTab(subject, allTags);
+  else renderStatsTab(subject);
+}
+
+function getAllTags(subject){
+  const set = new Set();
+  subject.questions.forEach(q => (q.tags||[]).forEach(t=>set.add(t)));
+  return Array.from(set).sort();
+}
+
+function filteredQuestions(subject){
+  return subject.questions.filter(q=>{
+    if(bankTagFilter.size>0){
+      const hasAll = Array.from(bankTagFilter).every(t=>(q.tags||[]).includes(t));
+      if(!hasAll) return false;
+    }
+    if(searchQuery){
+      const hay = (q.questionText + ' ' + (q.parentStimulus||'')).toLowerCase();
+      if(!hay.includes(searchQuery.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
+function renderBankTab(subject, allTags){
+  const content = document.getElementById('tabContent');
+  const qs = filteredQuestions(subject);
+  const groupIndexMap = {};
+  subject.groups.forEach((g,i)=>{ groupIndexMap[g.id] = i+1; });
+  content.innerHTML = `
+    <div class="toolbar">
+      <button class="btn" id="tagFilterBtn"><i class="fa-solid fa-tag"></i> Filter tags ${bankTagFilter.size?`(${bankTagFilter.size})`:''}</button>
+      <div id="tagFilterPanel" style="display:none;"></div>
+    </div>
+    ${qs.length===0 ? `<div class="empty-state" style="height:200px;"><i class="fa-solid fa-circle-question"></i><div>No questions match. Try importing questions or adjusting filters.</div></div>` : `
+    <table>
+      <thead><tr><th style="width:36px;">#</th><th>Question</th><th style="width:200px;">Tags</th><th style="width:110px;">Type</th><th style="width:100px;">Actions</th></tr></thead>
+      <tbody>
+        ${qs.map((q,i)=>{
+          let typeCell;
+          if(q.type==='single'){
+            typeCell = `<span class="type-badge single">Single</span>`;
+          } else {
+            const group = subject.groups.find(g=>g.id===q.groupId);
+            const gNum = groupIndexMap[q.groupId] || '?';
+            const pos = group ? group.childQuestionIds.indexOf(q.id)+1 : '?';
+            const of = group ? group.childQuestionIds.length : '?';
+            typeCell = `<button class="type-badge group group-preview-btn" data-preview-group="${q.groupId}" title="Preview all questions in this group">Group ${gNum} <span style="opacity:.7;">· ${pos}/${of}</span></button>`;
+          }
+          return `
+          <tr>
+            <td>${i+1}</td>
+            <td class="qprev">${escapeHtml(truncate(q.questionText,90))}</td>
+            <td>${(q.tags||[]).map(t=>`<span class="pill">${escapeHtml(t)}</span>`).join('')}</td>
+            <td>${typeCell}</td>
+            <td><div class="row-actions">
+              <button data-edit="${q.id}" title="Edit"><i class="fa-solid fa-pen"></i></button>
+              <button data-del="${q.id}" class="del-action" title="Delete"><i class="fa-solid fa-trash"></i></button>
+            </div></td>
+          </tr>
+        `;}).join('')}
+      </tbody>
+    </table>`}
+  `;
+  const panel = content.querySelector('#tagFilterPanel');
+  panel.innerHTML = `<div class="tagselect" style="margin-top:8px;">${allTags.length? allTags.map(t=>`
+    <label><input type="checkbox" value="${escapeHtml(t)}" ${bankTagFilter.has(t)?'checked':''}> ${escapeHtml(t)}</label>
+  `).join('') : '<span class="hint">No tags yet</span>'}</div>`;
+  content.querySelector('#tagFilterBtn').addEventListener('click', ()=>{
+    panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+  });
+  panel.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      if(inp.checked) bankTagFilter.add(inp.value); else bankTagFilter.delete(inp.value);
+      renderBankTab(subject, allTags);
+      content.querySelector('#tagFilterPanel').style.display='block';
+    });
+  });
+  content.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openEditModal(subject.id, b.dataset.edit)));
+  content.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmModal('Delete this question? This cannot be undone.', ()=>{
+      deleteQuestion(subject.id, b.dataset.del);
+    });
+  }));
+  content.querySelectorAll('[data-preview-group]').forEach(b=>b.addEventListener('click', ()=>{
+    openGroupPreviewModal(subject.id, b.dataset.previewGroup);
+  }));
+}
+
+function openGroupPreviewModal(subjectId, groupId){
+  const subject = state.subjects[subjectId];
+  const group = subject.groups.find(g=>g.id===groupId);
+  if(!group){ toast('This group no longer exists.', 'error'); return; }
+  const siblings = group.childQuestionIds.map(id=>subject.questions.find(q=>q.id===id)).filter(Boolean);
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="gpOverlay">
+      <div class="modal wide">
+        <div class="modal-head"><h3>Group Preview <span style="color:var(--text-faint); font-weight:500;">· ${siblings.length} question${siblings.length!==1?'s':''}</span></h3><button id="gpClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          <div class="quiz-stimulus" style="max-height:200px; margin-bottom:16px;">${group.stimulus ? renderRichText(group.stimulus) : '(No stimulus text)'}</div>
+          <div class="review-list">
+            ${siblings.map((q,i)=>`
+              <div class="review-item">
+                <div class="rq-text">${i+1}. ${renderRichText(q.questionText)}</div>
+                <div style="margin-bottom:8px;">${(q.tags||[]).map(t=>`<span class="pill">${escapeHtml(t)}</span>`).join('')}</div>
+                <div class="rq-ans right"><span class="lbl">Correct answer:</span>${renderRichText(q.options[q.correctAnswerIndex])}</div>
+                <div style="margin-top:10px;"><button class="btn ghost" data-gp-edit="${q.id}"><i class="fa-solid fa-pen"></i> Edit</button></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  renderMath(root);
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#gpClose').addEventListener('click', close);
+  root.querySelector('#gpOverlay').addEventListener('click', (e)=>{ if(e.target.id==='gpOverlay') close(); });
+  root.querySelectorAll('[data-gp-edit]').forEach(b=>b.addEventListener('click', ()=>{
+    close();
+    openEditModal(subjectId, b.dataset.gpEdit);
+  }));
+}
+
+let statsSortKey = 'priority';
+let statsSortDir = 'desc';
+function renderStatsTab(subject){
+  const content = document.getElementById('tabContent');
+  const qs = filteredQuestions(subject);
+
+  // ---- Overview strip ----
+  const totalQuestions = qs.length;
+  let totalShown=0, totalCorrect=0, notStarted=0;
+  qs.forEach(q=>{
+    const t = q.tracking || {timesShown:0,timesCorrect:0,timesWrong:0};
+    totalShown += t.timesShown;
+    totalCorrect += t.timesCorrect;
+    if(t.timesShown===0) notStarted++;
+  });
+  const overallPct = totalShown>0 ? Math.round((totalCorrect/totalShown)*100) : null;
+
+  // ---- Mastery breakdown ----
+  let mNotStarted=0, mNeedsWork=0, mGettingThere=0, mMastered=0;
+  qs.forEach(q=>{
+    const t = q.tracking || {timesShown:0,timesCorrect:0,timesWrong:0};
+    if(t.timesShown===0){ mNotStarted++; return; }
+    const pct = (t.timesCorrect/t.timesShown)*100;
+    if(pct < 50) mNeedsWork++;
+    else if(pct < 75) mGettingThere++;
+    else mMastered++;
+  });
+  const masteryTotal = Math.max(1, totalQuestions);
+  const seg = (n)=> (n/masteryTotal*100).toFixed(2)+'%';
+
+  // ---- Sortable table rows ----
+  const rows = qs.map(q=>{
+    const t = q.tracking || {timesShown:0,timesCorrect:0,timesWrong:0};
+    const pct = t.timesShown ? (t.timesCorrect/t.timesShown)*100 : null;
+    const priority = computePriority(t);
+    return {q, t, pct, priority};
+  });
+  const sortExtractors = {
+    question: r=> r.q.questionText.toLowerCase(),
+    shown: r=> r.t.timesShown,
+    correct: r=> r.t.timesCorrect,
+    pct: r=> r.pct===null ? -1 : r.pct,
+    priority: r=> r.priority
+  };
+  const extractor = sortExtractors[statsSortKey] || sortExtractors.priority;
+  rows.sort((a,b)=>{
+    const av = extractor(a), bv = extractor(b);
+    let cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return statsSortDir === 'asc' ? cmp : -cmp;
+  });
+  function thAttrs(key){
+    const active = statsSortKey === key;
+    const arrow = active ? (statsSortDir==='asc' ? '▲' : '▼') : '▾';
+    return {cls: 'sortable' + (active?' active':''), arrow};
+  }
+  const thQ = thAttrs('question'), thShown = thAttrs('shown'), thCorrect = thAttrs('correct'), thPct = thAttrs('pct'), thPri = thAttrs('priority');
+
+  content.innerHTML = `
+    <div class="toolbar">
+      <button class="btn danger" id="resetHistoryBtn"><i class="fa-solid fa-rotate-left"></i> Reset History</button>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat-card"><div class="stat-value">${totalQuestions}</div><div class="stat-label">Question${totalQuestions!==1?'s':''}</div></div>
+      <div class="stat-card"><div class="stat-value">${totalShown}</div><div class="stat-label">Total attempts</div></div>
+      <div class="stat-card"><div class="stat-value">${overallPct===null?'—':overallPct+'%'}</div><div class="stat-label">Overall accuracy</div></div>
+      <div class="stat-card"><div class="stat-value">${notStarted}</div><div class="stat-label">Not yet practiced</div></div>
+    </div>
+
+    ${totalQuestions>0 ? `
+    <div class="mastery-block">
+      <div class="stats-section-title">Mastery breakdown</div>
+      <div class="mastery-bar">
+        ${mNotStarted?`<div class="mastery-seg notstarted" style="width:${seg(mNotStarted)};" title="Not started: ${mNotStarted}"></div>`:''}
+        ${mNeedsWork?`<div class="mastery-seg needswork" style="width:${seg(mNeedsWork)};" title="Needs work: ${mNeedsWork}"></div>`:''}
+        ${mGettingThere?`<div class="mastery-seg gettingthere" style="width:${seg(mGettingThere)};" title="Getting there: ${mGettingThere}"></div>`:''}
+        ${mMastered?`<div class="mastery-seg mastered" style="width:${seg(mMastered)};" title="Mastered: ${mMastered}"></div>`:''}
+      </div>
+      <div class="mastery-legend">
+        <span><span class="dot notstarted"></span>Not started (${mNotStarted})</span>
+        <span><span class="dot needswork"></span>Needs work &lt;50% (${mNeedsWork})</span>
+        <span><span class="dot gettingthere"></span>Getting there 50–74% (${mGettingThere})</span>
+        <span><span class="dot mastered"></span>Mastered 75%+ (${mMastered})</span>
+      </div>
+    </div>` : ''}
+
+    <table>
+      <thead><tr>
+        <th class="${thQ.cls}" data-sort="question">Question <span class="sort-arrow">${thQ.arrow}</span></th>
+        <th style="width:160px;">Tags</th>
+        <th class="${thShown.cls}" data-sort="shown" style="width:90px;">Shown <span class="sort-arrow">${thShown.arrow}</span></th>
+        <th class="${thCorrect.cls}" data-sort="correct" style="width:100px;">Correct/Wrong <span class="sort-arrow">${thCorrect.arrow}</span></th>
+        <th class="${thPct.cls}" data-sort="pct" style="width:80px;">% Correct <span class="sort-arrow">${thPct.arrow}</span></th>
+        <th class="${thPri.cls}" data-sort="priority" style="width:100px;">Priority <span class="sort-arrow">${thPri.arrow}</span></th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(({q,t,pct,priority})=>{
+          const pctClass = pct===null ? '' : (pct>=75?'pct-good':pct>=50?'pct-mid':'pct-bad');
+          return `<tr>
+            <td class="qprev">${escapeHtml(truncate(q.questionText,80))}</td>
+            <td>${(q.tags||[]).map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join('')}</td>
+            <td>${t.timesShown}</td>
+            <td>${t.timesCorrect}/${t.timesWrong}</td>
+            <td class="${pctClass}">${pct===null?'—':Math.round(pct)+'%'}</td>
+            <td>${priority.toFixed(1)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+  content.querySelectorAll('th.sortable').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const key = th.dataset.sort;
+      if(statsSortKey === key){
+        statsSortDir = statsSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        statsSortKey = key;
+        statsSortDir = key === 'question' ? 'asc' : 'desc';
+      }
+      renderStatsTab(subject);
+    });
+  });
+  content.querySelector('#resetHistoryBtn').addEventListener('click', ()=>{
+    confirmModal('This will reset all tracking data (times shown, correct, wrong) for this subject. Proceed?', ()=>{
+      subject.questions.forEach(q=>{ q.tracking = {timesShown:0,timesCorrect:0,timesWrong:0,lastSeen:null}; });
+      touchSubject(subject.id); saveState(); renderMain();
+      toast('History reset.', 'success');
+    });
+  });
+}
+function computePriority(t){
+  const rate = t.timesShown ? t.timesCorrect/t.timesShown : 0;
+  const seenFactor = Math.max(0, 5 - t.timesShown);
+  return (1-rate)*100 + seenFactor*10;
+}
+
+function truncate(str, n){ if(!str) return ''; return str.length>n ? str.slice(0,n)+'…' : str; }
+function escapeHtml(str){
+  if(str===undefined||str===null) return '';
+  return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* Renders ```block``` and `inline` code spans as real <pre>/<code> elements.
+   Everything else is HTML-escaped as plain text (with newlines as <br>). */
+function renderRichText(str){
+  if(str===undefined||str===null) return '';
+  const raw = String(str);
+  const blockParts = raw.split(/```([\s\S]*?)```/g);
+  let html = '';
+  blockParts.forEach((part, i)=>{
+    if(i % 2 === 1){
+      html += `<pre><code>${escapeHtml(part.replace(/^\n/,'').replace(/\n$/,''))}</code></pre>`;
+    } else {
+      const inlineParts = part.split(/`([^`\n]+?)`/g);
+      inlineParts.forEach((seg, j)=>{
+        if(j % 2 === 1){
+          html += `<code>${escapeHtml(seg)}</code>`;
+        } else {
+          html += escapeHtml(seg).replace(/\n/g, '<br>');
+        }
+      });
+    }
+  });
+  return html;
+}
+
+/* ============================= DELETE QUESTION ============================= */
+function deleteQuestion(subjectId, qId){
+  const subject = state.subjects[subjectId];
+  const q = subject.questions.find(x=>x.id===qId);
+  if(!q) return;
+  subject.questions = subject.questions.filter(x=>x.id!==qId);
+  if(q.groupId){
+    const group = subject.groups.find(g=>g.id===q.groupId);
+    if(group){
+      group.childQuestionIds = group.childQuestionIds.filter(id=>id!==qId);
+      if(group.childQuestionIds.length===0){
+        subject.groups = subject.groups.filter(g=>g.id!==group.id);
+      }
+    }
+  }
+  touchSubject(subjectId);
+  saveState(); renderMain();
+  toast('Question deleted.', 'success');
+}
+
+/* ============================= ADD SUBJECT ============================= */
+document.getElementById('btnAddSubject').addEventListener('click', ()=>{
+  openFormModal({
+    title:'Add Subject',
+    fields:[{key:'name', label:'Subject name', type:'text', placeholder:'e.g. Cardiology 101'}],
+    onSubmit:(vals)=>{
+      if(!vals.name || !vals.name.trim()){ toast('Subject name is required.', 'error'); return false; }
+      const id = uid('subject');
+      state.subjects[id] = { id, name: vals.name.trim(), questions:[], groups:[], updatedAt: new Date().toISOString() };
+      setActiveSubject(id);
+      saveState(); renderAll();
+      toast('Subject added.', 'success');
+      return true;
+    }
+  });
+});
+
+/* ============================= GENERIC FORM MODAL ============================= */
+function openFormModal({title, fields, onSubmit, submitLabel='Save'}){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="genOverlay">
+      <div class="modal">
+        <div class="modal-head"><h3>${escapeHtml(title)}</h3><button id="genClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          ${fields.map(f=>`
+            <div class="field"><label>${escapeHtml(f.label)}</label>
+              <input type="text" id="f_${f.key}" placeholder="${escapeHtml(f.placeholder||'')}">
+            </div>`).join('')}
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="genCancel">Cancel</button>
+          <button class="btn primary" id="genSubmit">${escapeHtml(submitLabel)}</button>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#genClose').addEventListener('click', close);
+  root.querySelector('#genCancel').addEventListener('click', close);
+  root.querySelector('#genOverlay').addEventListener('click', (e)=>{ if(e.target.id==='genOverlay') close(); });
+  root.querySelector('#genSubmit').addEventListener('click', ()=>{
+    const vals = {};
+    fields.forEach(f=> vals[f.key] = root.querySelector('#f_'+f.key).value);
+    const ok = onSubmit(vals);
+    if(ok !== false) close();
+  });
+}
+
+function confirmModal(message, onConfirm){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="confOverlay">
+      <div class="modal" style="max-width:400px;">
+        <div class="modal-body" style="padding-top:20px; font-size:14px; line-height:1.5;">${escapeHtml(message)}</div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="confCancel">Cancel</button>
+          <button class="btn danger" id="confOk">Confirm</button>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#confCancel').addEventListener('click', close);
+  root.querySelector('#confOverlay').addEventListener('click', (e)=>{ if(e.target.id==='confOverlay') close(); });
+  root.querySelector('#confOk').addEventListener('click', ()=>{ onConfirm(); close(); });
+}
+
+/* ============================= EDIT QUESTION MODAL ============================= */
+function openEditModal(subjectId, qId){
+  const subject = state.subjects[subjectId];
+  const q = subject.questions.find(x=>x.id===qId);
+  if(!q) return;
+  const root = document.getElementById('modalRoot');
+  const isGroupChild = q.type === 'group_child';
+  root.innerHTML = `
+    <div class="overlay" id="editOverlay">
+      <div class="modal wide">
+        <div class="modal-head"><h3>Edit Question</h3><button id="editClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          ${isGroupChild ? `
+          <div class="field"><label>Stimulus (shared across group)</label>
+            <textarea id="editStimulus">${escapeHtml(q.parentStimulus||'')}</textarea>
+          </div>` : ''}
+          <div class="field"><label>Question Text</label>
+            <textarea id="editQuestionText">${escapeHtml(q.questionText)}</textarea>
+          </div>
+          <div class="field"><label>Options</label>
+            <div id="optionsWrap"></div>
+            <button class="btn ghost" id="addOptionBtn" type="button"><i class="fa-solid fa-plus"></i> Add option</button>
+            <div class="hint">Select the radio button next to the correct option.</div>
+          </div>
+          <div class="field"><label>Tags (semicolon separated)</label>
+            <input type="text" id="editTags" value="${escapeHtml((q.tags||[]).join('; '))}">
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="editCancel">Cancel</button>
+          <button class="btn primary" id="editSave">Save</button>
+        </div>
+      </div>
+    </div>`;
+  const optionsWrap = root.querySelector('#optionsWrap');
+  function renderOptions(options, correctIdx){
+    optionsWrap.innerHTML = options.map((opt,i)=>`
+      <div class="option-row">
+        <input type="radio" name="correctOpt" value="${i}" ${i===correctIdx?'checked':''}>
+        <input type="text" class="opt-text" value="${escapeHtml(opt)}">
+        <button class="rm-opt" type="button" data-rm="${i}"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    `).join('');
+    optionsWrap.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click', ()=>{
+      const idx = parseInt(b.dataset.rm);
+      const curOpts = Array.from(optionsWrap.querySelectorAll('.opt-text')).map(i=>i.value);
+      const curCorrect = parseInt(optionsWrap.querySelector('input[name=correctOpt]:checked')?.value ?? 0);
+      if(curOpts.length<=2){ toast('A question needs at least 2 options.', 'error'); return; }
+      curOpts.splice(idx,1);
+      let newCorrect = curCorrect;
+      if(idx===curCorrect) newCorrect = 0;
+      else if(idx<curCorrect) newCorrect = curCorrect-1;
+      renderOptions(curOpts, newCorrect);
+    }));
+  }
+  renderOptions(q.options.slice(), q.correctAnswerIndex);
+  root.querySelector('#addOptionBtn').addEventListener('click', ()=>{
+    const curOpts = Array.from(optionsWrap.querySelectorAll('.opt-text')).map(i=>i.value);
+    if(curOpts.length>=5){ toast('Maximum 5 options.', 'error'); return; }
+    const curCorrect = parseInt(optionsWrap.querySelector('input[name=correctOpt]:checked')?.value ?? 0);
+    curOpts.push('');
+    renderOptions(curOpts, curCorrect);
+  });
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#editClose').addEventListener('click', close);
+  root.querySelector('#editCancel').addEventListener('click', close);
+  root.querySelector('#editOverlay').addEventListener('click', (e)=>{ if(e.target.id==='editOverlay') close(); });
+  root.querySelector('#editSave').addEventListener('click', ()=>{
+    const options = Array.from(optionsWrap.querySelectorAll('.opt-text')).map(i=>i.value.trim());
+    if(options.some(o=>!o)){ toast('Options cannot be blank.', 'error'); return; }
+    const correctIdx = parseInt(optionsWrap.querySelector('input[name=correctOpt]:checked')?.value ?? 0);
+    const questionText = root.querySelector('#editQuestionText').value.trim();
+    if(!questionText){ toast('Question text is required.', 'error'); return; }
+    const tags = root.querySelector('#editTags').value.split(';').map(t=>t.trim()).filter(Boolean);
+    q.questionText = questionText;
+    q.options = options;
+    q.correctAnswerIndex = correctIdx;
+    q.tags = tags;
+    if(isGroupChild){
+      const newStimulus = root.querySelector('#editStimulus').value;
+      q.parentStimulus = newStimulus;
+      // propagate to all siblings in the group
+      subject.questions.forEach(sib=>{
+        if(sib.groupId === q.groupId) sib.parentStimulus = newStimulus;
+      });
+      const group = subject.groups.find(g=>g.id===q.groupId);
+      if(group) group.stimulus = newStimulus;
+    }
+    touchSubject(subjectId);
+    saveState(); renderMain();
+    toast('Question saved.', 'success');
+    close();
+  });
+}
+
+/* ============================= IMPORT (plain text) ============================= */
+document.getElementById('btnImport').addEventListener('click', openImportModal);
+function openImportModal(){
+  const subjects = Object.values(state.subjects);
+  if(subjects.length===0){ toast('Add a subject first.', 'error'); return; }
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="impOverlay">
+      <div class="modal wide">
+        <div class="modal-head"><h3>Import Questions</h3><button id="impClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          <div class="field"><label>Target Subject</label>
+            <select class="select-input" id="impSubject" style="width:100%;">
+              ${subjects.map(s=>`<option value="${s.id}" ${s.id===activeSubjectId?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Paste text (blocks separated by ---)</label>
+            <textarea id="impText" style="min-height:260px; font-family:var(--font-mono); font-size:12.5px;" placeholder="Type: Single&#10;Question: ...&#10;Options: A | B | C&#10;Answer: 0&#10;Tags: a; b"></textarea>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="impCancel">Cancel</button>
+          <button class="btn primary" id="impSubmit">Import</button>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#impClose').addEventListener('click', close);
+  root.querySelector('#impCancel').addEventListener('click', close);
+  root.querySelector('#impOverlay').addEventListener('click', (e)=>{ if(e.target.id==='impOverlay') close(); });
+  root.querySelector('#impSubmit').addEventListener('click', ()=>{
+    const subjectId = root.querySelector('#impSubject').value;
+    const text = root.querySelector('#impText').value;
+    const result = parseImportText(text, subjectId);
+    if(result.added===0 && result.skipped===0){ toast('No valid blocks found.', 'error'); return; }
+    touchSubject(subjectId);
+    saveState(); setActiveSubject(subjectId); activeTab='bank'; renderAll();
+    toast(`Imported ${result.added} question(s).${result.skipped? ' Skipped '+result.skipped+' invalid block(s).':''}`, result.skipped?'':'success');
+    close();
+  });
+}
+
+function parseImportText(text, subjectId){
+  const subject = state.subjects[subjectId];
+  const blocks = text.split(/^---\s*$/m).map(b=>b.trim()).filter(Boolean);
+  let added = 0, skipped = 0;
+  let currentGroup = null; // {id, stimulus} while consuming implicit children
+
+  for(const block of blocks){
+    const fields = parseFields(block);
+    const hasType = 'type' in fields;
+    const explicitType = hasType ? fields.type.trim().toLowerCase() : null;
+
+    if(explicitType === 'group'){
+      // validate & create new group
+      if(!fields.question || !fields.options || !('answer' in fields)){ skipped++; currentGroup=null; continue; }
+      const options = fields.options.split('|').map(o=>o.trim()).filter(Boolean);
+      const answerIdx = parseInt(fields.answer);
+      if(options.length<2 || options.length>5 || isNaN(answerIdx) || answerIdx<0 || answerIdx>=options.length){ skipped++; currentGroup=null; continue; }
+      const groupId = uid('group');
+      const stimulus = fields.stimulus || '';
+      const group = { id: groupId, stimulus, childQuestionIds: [] };
+      subject.groups.push(group);
+      const childId = uid('q');
+      const q = {
+        id: childId, type:'group_child', groupId, parentStimulus: stimulus,
+        questionText: fields.question, options, correctAnswerIndex: answerIdx,
+        tags: (fields.tags||'').split(';').map(t=>t.trim()).filter(Boolean),
+        tracking: {timesShown:0,timesCorrect:0,timesWrong:0,lastSeen:null}
+      };
+      subject.questions.push(q);
+      group.childQuestionIds.push(childId);
+      currentGroup = group;
+      added++;
+    } else if(explicitType === 'single'){
+      currentGroup = null;
+      if(!fields.question || !fields.options || !('answer' in fields)){ skipped++; continue; }
+      const options = fields.options.split('|').map(o=>o.trim()).filter(Boolean);
+      const answerIdx = parseInt(fields.answer);
+      if(options.length<2 || options.length>5 || isNaN(answerIdx) || answerIdx<0 || answerIdx>=options.length){ skipped++; continue; }
+      const q = {
+        id: uid('q'), type:'single', groupId:null, parentStimulus:null,
+        questionText: fields.question, options, correctAnswerIndex: answerIdx,
+        tags: (fields.tags||'').split(';').map(t=>t.trim()).filter(Boolean),
+        tracking: {timesShown:0,timesCorrect:0,timesWrong:0,lastSeen:null}
+      };
+      subject.questions.push(q);
+      added++;
+    } else {
+      // no Type: declaration -> implicit child of currentGroup, if any
+      if(!currentGroup){ skipped++; continue; }
+      if(!fields.question || !fields.options || !('answer' in fields)){ skipped++; continue; }
+      const options = fields.options.split('|').map(o=>o.trim()).filter(Boolean);
+      const answerIdx = parseInt(fields.answer);
+      if(options.length<2 || options.length>5 || isNaN(answerIdx) || answerIdx<0 || answerIdx>=options.length){ skipped++; continue; }
+      const childId = uid('q');
+      const q = {
+        id: childId, type:'group_child', groupId: currentGroup.id, parentStimulus: currentGroup.stimulus,
+        questionText: fields.question, options, correctAnswerIndex: answerIdx,
+        tags: (fields.tags||'').split(';').map(t=>t.trim()).filter(Boolean),
+        tracking: {timesShown:0,timesCorrect:0,timesWrong:0,lastSeen:null}
+      };
+      subject.questions.push(q);
+      currentGroup.childQuestionIds.push(childId);
+      added++;
+    }
+  }
+  return {added, skipped};
+}
+function parseFields(block){
+  const fields = {};
+  const lines = block.split('\n');
+  let curKey = null;
+  let inFence = false;
+  for(const line of lines){
+    if(/^\s*```/.test(line)){
+      inFence = !inFence;
+      if(curKey) fields[curKey] += '\n' + line;
+      continue;
+    }
+    if(inFence){
+      if(curKey) fields[curKey] += '\n' + line;
+      continue;
+    }
+    const m = line.match(/^([A-Za-z]+)\s*:\s*(.*)$/);
+    if(m){
+      curKey = m[1].trim().toLowerCase();
+      fields[curKey] = m[2];
+    } else if(curKey){
+      fields[curKey] += '\n' + line;
+    }
+  }
+  return fields;
+}
+
+/* ============================= EXPORT / IMPORT BACKUP ============================= */
+document.getElementById('btnExport').addEventListener('click', openExportOptionsModal);
+function openExportOptionsModal(){
+  const subjects = Object.values(state.subjects);
+  if(subjects.length===0){ toast('Add a subject with questions first.', 'error'); return; }
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="exOverlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Export Quiz Pack</h3><button id="exClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          <div class="field">
+            <label>Courses to include</label>
+            <div class="tagselect" id="exSubjectList" style="flex-direction:column; align-items:flex-start; max-height:180px;">
+              ${subjects.map(s=>`
+                <label style="width:100%;"><input type="checkbox" class="ex-subj" value="${s.id}" checked> ${escapeHtml(s.name)} <span style="color:var(--text-faint);">(${s.questions.length})</span></label>
+              `).join('')}
+            </div>
+            <div style="margin-top:6px;"><button class="btn ghost" id="exSelectAll" style="padding:4px 10px; font-size:12px;">Select all</button> <button class="btn ghost" id="exSelectNone" style="padding:4px 10px; font-size:12px;">Select none</button></div>
+          </div>
+          <div class="field">
+            <label>Progress data</label>
+            <div class="radio-row" style="flex-direction:column; align-items:flex-start; gap:10px;">
+              <label><input type="radio" name="exProgress" value="include" checked> Include my progress (times shown, correct/wrong)</label>
+              <label><input type="radio" name="exProgress" value="strip"> Leave progress out — just the questions and tags (good for sharing)</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="exCancel">Cancel</button>
+          <button class="btn primary" id="exConfirm">Export</button>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#exClose').addEventListener('click', close);
+  root.querySelector('#exCancel').addEventListener('click', close);
+  root.querySelector('#exOverlay').addEventListener('click', (e)=>{ if(e.target.id==='exOverlay') close(); });
+  root.querySelector('#exSelectAll').addEventListener('click', ()=>{
+    root.querySelectorAll('.ex-subj').forEach(cb=> cb.checked = true);
+  });
+  root.querySelector('#exSelectNone').addEventListener('click', ()=>{
+    root.querySelectorAll('.ex-subj').forEach(cb=> cb.checked = false);
+  });
+  root.querySelector('#exConfirm').addEventListener('click', ()=>{
+    const selectedIds = Array.from(root.querySelectorAll('.ex-subj:checked')).map(cb=>cb.value);
+    if(selectedIds.length===0){ toast('Select at least one course to export.', 'error'); return; }
+    const stripProgress = root.querySelector('input[name=exProgress]:checked').value === 'strip';
+    exportQuizPack(selectedIds, stripProgress);
+    close();
+  });
+}
+
+function exportQuizPack(selectedIds, stripProgress){
+  const exportSubjects = {};
+  selectedIds.forEach(id=>{
+    const s = state.subjects[id];
+    if(!s) return;
+    const clonedQuestions = s.questions.map(q=>{
+      const clone = Object.assign({}, q, {tags:(q.tags||[]).slice(), options:(q.options||[]).slice()});
+      clone.tracking = stripProgress ? freshTracking() : Object.assign({}, q.tracking || freshTracking());
+      return clone;
+    });
+    const clonedGroups = s.groups.map(g=> Object.assign({}, g, {childQuestionIds:(g.childQuestionIds||[]).slice()}));
+    exportSubjects[id] = Object.assign({}, s, {questions: clonedQuestions, groups: clonedGroups});
+  });
+  const exportData = {subjects: exportSubjects, version: state.version || '1.0'};
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const subjectCount = selectedIds.length;
+  const namePart = subjectCount===1 ? slugify(state.subjects[selectedIds[0]].name) : (subjectCount===Object.keys(state.subjects).length ? 'all' : subjectCount+'-courses');
+  a.href = url; a.download = `quiz-pack-${namePart}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Quiz Pack exported — ${subjectCount} course${subjectCount!==1?'s':''}${stripProgress?', progress left out':''}.`, 'success');
+}
+function slugify(str){
+  return String(str).trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40) || 'course';
+}
+document.getElementById('btnImportBackup').addEventListener('click', ()=>{
+  document.getElementById('backupFileInput').click();
+});
+document.getElementById('backupFileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data.subjects) throw new Error('That file doesn\'t look like a Quiz Pack.');
+      openImportOptionsModal(data);
+    }catch(err){
+      toast('Failed to read Quiz Pack: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+/* ---- Import Options: merge vs replace, and progress-handling policy ---- */
+function openImportOptionsModal(incomingData){
+  const incomingSubjects = Object.values(incomingData.subjects || {});
+  const incomingQCount = incomingSubjects.reduce((n,s)=>n+(s.questions||[]).length, 0);
+  const hasLocalData = Object.keys(state.subjects).length > 0;
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="ioOverlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Import Quiz Pack</h3><button id="ioClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          <div class="hint" style="margin-bottom:14px; font-size:12.5px;">
+            This pack contains ${incomingSubjects.length} course${incomingSubjects.length!==1?'s':''} and ${incomingQCount} question${incomingQCount!==1?'s':''}.
+          </div>
+          <div class="field">
+            <label>Adding courses & questions</label>
+            <div class="radio-row" style="flex-direction:column; align-items:flex-start; gap:10px;">
+              <label><input type="radio" name="ioMode" value="merge" checked> Merge — add only what's new, keep everything I already have${hasLocalData?'':''}</label>
+              <label><input type="radio" name="ioMode" value="replace"> Replace everything — erase my current courses and questions, use only this pack</label>
+            </div>
+          </div>
+          <div class="field" id="ioProgressField">
+            <label>Keeping progress (times shown, correct/wrong)</label>
+            <div class="radio-row" style="flex-direction:column; align-items:flex-start; gap:10px;">
+              <label><input type="radio" name="ioProgress" value="keep-imported" checked> Use the progress saved in this pack for any matching questions</label>
+              <label><input type="radio" name="ioProgress" value="reset-new"> Keep my own progress; start newly added questions at zero</label>
+              <label><input type="radio" name="ioProgress" value="reset-all"> Reset progress for everything after importing</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="ioCancel">Cancel</button>
+          <button class="btn primary" id="ioConfirm">Import</button>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  const progressField = root.querySelector('#ioProgressField');
+  root.querySelectorAll('input[name=ioMode]').forEach(r=>{
+    r.addEventListener('change', ()=>{
+      const isReplace = root.querySelector('input[name=ioMode]:checked').value === 'replace';
+      progressField.style.opacity = isReplace ? '.4' : '1';
+      progressField.querySelectorAll('input').forEach(i=> i.disabled = isReplace);
+    });
+  });
+  root.querySelector('#ioClose').addEventListener('click', close);
+  root.querySelector('#ioCancel').addEventListener('click', close);
+  root.querySelector('#ioOverlay').addEventListener('click', (e)=>{ if(e.target.id==='ioOverlay') close(); });
+  root.querySelector('#ioConfirm').addEventListener('click', ()=>{
+    const mode = root.querySelector('input[name=ioMode]:checked').value;
+    if(mode === 'replace'){
+      confirmModal('This will erase all your current courses, questions, and progress, and replace them with this pack. This cannot be undone. Proceed?', ()=>{
+        state = incomingData;
+        setActiveSubject(Object.keys(state.subjects)[0] || null);
+        saveState(); renderAll();
+        toast('Quiz Pack imported — your data was replaced.', 'success');
+        close();
+      });
+    } else {
+      const policy = root.querySelector('input[name=ioProgress]:checked').value;
+      const report = mergeImportedState(incomingData, policy);
+      saveState(); renderAll();
+      const parts = [];
+      if(report.subjectsAdded) parts.push(`${report.subjectsAdded} new course${report.subjectsAdded!==1?'s':''}`);
+      if(report.questionsAdded) parts.push(`${report.questionsAdded} new question${report.questionsAdded!==1?'s':''}`);
+      if(report.questionsMatched) parts.push(`${report.questionsMatched} already had`);
+      toast(parts.length ? `Merged: ${parts.join(', ')}.` : 'Nothing new to add — you already had everything in this pack.', 'success');
+      close();
+    }
+  });
+}
+
+/* Normalizes text for comparison only (trim, collapse whitespace, lowercase). */
+function normalizeText(s){ return (s||'').trim().replace(/\s+/g,' ').toLowerCase(); }
+
+/* A content-based identity for a question, since imported IDs won't line up
+   across different browsers/devices. Two questions are "the same" if their
+   text, options, correct answer, and (for group children) stimulus all match. */
+function fingerprintQuestion(q){
+  const stim = q.type === 'group_child' ? normalizeText(q.parentStimulus) : '';
+  const qt = normalizeText(q.questionText);
+  const opts = (q.options||[]).map(o=>normalizeText(o)).join('|');
+  return stim + '::' + qt + '::' + opts + '::' + q.correctAnswerIndex;
+}
+
+function freshTracking(){
+  return {timesShown:0, timesCorrect:0, timesWrong:0, lastSeen:null};
+}
+function trackingFrom(q, policy){
+  if(policy === 'keep-imported' && q.tracking){
+    return {
+      timesShown: q.tracking.timesShown||0,
+      timesCorrect: q.tracking.timesCorrect||0,
+      timesWrong: q.tracking.timesWrong||0,
+      lastSeen: q.tracking.lastSeen||null
+    };
+  }
+  return freshTracking();
+}
+
+function mergeImportedState(incomingData, policy){
+  const report = {subjectsAdded:0, questionsAdded:0, questionsMatched:0};
+  const incomingSubjects = Object.values(incomingData.subjects || {});
+
+  incomingSubjects.forEach(incomingSubject=>{
+    const nameKey = normalizeText(incomingSubject.name);
+    let localSubject = Object.values(state.subjects).find(s=> normalizeText(s.name) === nameKey);
+    if(!localSubject){
+      localSubject = {id: uid('subject'), name: incomingSubject.name, questions:[], groups:[], updatedAt: new Date().toISOString()};
+      state.subjects[localSubject.id] = localSubject;
+      report.subjectsAdded++;
+    }
+
+    const localFingerprints = new Map();
+    localSubject.questions.forEach(q=> localFingerprints.set(fingerprintQuestion(q), q));
+    const localGroupByStimulus = new Map();
+    localSubject.groups.forEach(g=> localGroupByStimulus.set(normalizeText(g.stimulus), g));
+
+    (incomingSubject.questions||[]).forEach(incomingQ=>{
+      const fp = fingerprintQuestion(incomingQ);
+      const existing = localFingerprints.get(fp);
+      if(existing){
+        if(policy === 'keep-imported'){
+          existing.tracking = trackingFrom(incomingQ, 'keep-imported');
+        } else if(policy === 'reset-all'){
+          existing.tracking = freshTracking();
+        }
+        // 'reset-new' leaves existing local progress untouched
+        report.questionsMatched++;
+      } else {
+        const newId = uid('q');
+        let groupId = null, parentStimulus = null;
+        if(incomingQ.type === 'group_child'){
+          const stimKey = normalizeText(incomingQ.parentStimulus);
+          let localGroup = localGroupByStimulus.get(stimKey);
+          if(!localGroup){
+            localGroup = {id: uid('group'), stimulus: incomingQ.parentStimulus, childQuestionIds:[]};
+            localSubject.groups.push(localGroup);
+            localGroupByStimulus.set(stimKey, localGroup);
+          }
+          groupId = localGroup.id;
+          parentStimulus = incomingQ.parentStimulus;
+          localGroup.childQuestionIds.push(newId);
+        }
+        const clone = {
+          id: newId,
+          type: incomingQ.type,
+          groupId,
+          parentStimulus,
+          questionText: incomingQ.questionText,
+          options: (incomingQ.options||[]).slice(),
+          correctAnswerIndex: incomingQ.correctAnswerIndex,
+          tags: (incomingQ.tags||[]).slice(),
+          tracking: policy === 'reset-all' ? freshTracking() : trackingFrom(incomingQ, policy)
+        };
+        localSubject.questions.push(clone);
+        localFingerprints.set(fp, clone);
+        report.questionsAdded++;
+      }
+    });
+
+    localSubject.updatedAt = new Date().toISOString();
+  });
+
+  return report;
+}
+
+/* ============================= SEARCH ============================= */
+document.getElementById('searchInput').addEventListener('input', (e)=>{
+  searchQuery = e.target.value;
+  if(activeSubjectId) renderMain();
+});
+
+/* ============================= DARK MODE BUTTON ============================= */
+document.getElementById('btnDark').addEventListener('click', toggleDarkMode);
+document.getElementById('btnShortcuts').addEventListener('click', openShortcutsModal);
+function openShortcutsModal(){
+  const root = document.getElementById('modalRoot');
+  const rows = [
+    ['/', 'Focus search'],
+    ['g', 'Open Generate Quiz'],
+    ['n', 'Add subject'],
+    ['i', 'Open Import'],
+    ['d', 'Toggle dark mode'],
+    ['1–5', 'Select an option (in quiz)'],
+    ['Enter', 'Check answer / Next (in quiz)'],
+    ['← / →', 'Previous / Next question (in quiz)'],
+    ['Esc', 'Exit quiz / close dialog'],
+  ];
+  root.innerHTML = `
+    <div class="overlay" id="scOverlay">
+      <div class="modal" style="max-width:420px;">
+        <div class="modal-head"><h3>Keyboard Shortcuts</h3><button id="scClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          <table><tbody>
+            ${rows.map(r=>`<tr><td style="width:90px;"><span class="key-hint" style="margin-left:0;">${escapeHtml(r[0])}</span></td><td>${escapeHtml(r[1])}</td></tr>`).join('')}
+          </tbody></table>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#scClose').addEventListener('click', close);
+  root.querySelector('#scOverlay').addEventListener('click', (e)=>{ if(e.target.id==='scOverlay') close(); });
+}
+
+/* ============================= QUIZ GENERATOR ============================= */
+document.getElementById('btnGenerate').addEventListener('click', openGeneratorModal);
+function openGeneratorModal(){
+  const subjects = Object.values(state.subjects);
+  if(subjects.length===0){ toast('Add a subject with questions first.', 'error'); return; }
+  const root = document.getElementById('modalRoot');
+  const defaultSubjectId = activeSubjectId || subjects[0].id;
+  root.innerHTML = `
+    <div class="overlay" id="genQOverlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Generate Quiz</h3><button id="genQClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          <div class="field"><label>Subject</label>
+            <select class="select-input" id="gqSubject" style="width:100%;">
+              ${subjects.map(s=>`<option value="${s.id}" ${s.id===defaultSubjectId?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Number of items</label>
+            <input type="number" id="gqCount" value="10" min="1">
+          </div>
+          <div class="field"><label>Tags</label>
+            <div class="tagdrop" id="gqTagDrop">
+              <button type="button" class="tagdrop-btn" id="gqTagDropBtn">
+                <span class="preview" id="gqTagPreview">All tags</span>
+                <i class="fa-solid fa-chevron-down" style="font-size:11px; color:var(--text-faint);"></i>
+              </button>
+            </div>
+            <div class="radio-row" style="margin-top:8px;">
+              <label><input type="radio" name="gqMatch" value="or" checked> Match ANY (OR)</label>
+              <label><input type="radio" name="gqMatch" value="and"> Match ALL (AND)</label>
+            </div>
+          </div>
+          <div class="field"><label>Mode</label>
+            <div class="radio-row">
+              <label><input type="radio" name="gqMode" value="practice" checked> Practice (instant feedback)</label>
+              <label><input type="radio" name="gqMode" value="exam"> Exam (score at end)</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="gqCancel">Cancel</button>
+          <button class="btn primary" id="gqStart">Start Quiz</button>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  let gqSelectedTags = new Set();
+  function updateTagPreview(){
+    const preview = root.querySelector('#gqTagPreview');
+    if(gqSelectedTags.size===0){ preview.textContent = 'All tags'; preview.classList.remove('has-selection'); }
+    else{
+      preview.textContent = Array.from(gqSelectedTags).join(', ');
+      preview.classList.add('has-selection');
+    }
+  }
+  function refreshTags(){
+    gqSelectedTags = new Set();
+    updateTagPreview();
+    const dropWrap = root.querySelector('#gqTagDrop');
+    const existingPanel = dropWrap.querySelector('.tagdrop-panel');
+    if(existingPanel) existingPanel.remove();
+  }
+  function openTagPanel(){
+    const dropWrap = root.querySelector('#gqTagDrop');
+    let panel = dropWrap.querySelector('.tagdrop-panel');
+    if(panel){ panel.remove(); return; }
+    const subj = state.subjects[root.querySelector('#gqSubject').value];
+    const tags = getAllTags(subj);
+    panel = document.createElement('div');
+    panel.className = 'tagdrop-panel';
+    panel.innerHTML = `
+      <input type="text" class="tagdrop-search" placeholder="Type to filter tags…" autocomplete="off">
+      <div class="tagdrop-list"></div>
+    `;
+    dropWrap.appendChild(panel);
+    const searchInput = panel.querySelector('.tagdrop-search');
+    const listWrap = panel.querySelector('.tagdrop-list');
+    function renderList(filterStr){
+      const f = filterStr.trim().toLowerCase();
+      const visible = f ? tags.filter(t=>t.toLowerCase().includes(f)) : tags;
+      listWrap.innerHTML = visible.length ? visible.map(t=>`
+        <label><input type="checkbox" value="${escapeHtml(t)}" ${gqSelectedTags.has(t)?'checked':''}> ${escapeHtml(t)}</label>
+      `).join('') : `<span class="hint">${tags.length ? 'No matching tags' : 'No tags in this subject'}</span>`;
+      listWrap.querySelectorAll('input').forEach(inp=>{
+        inp.addEventListener('change', ()=>{
+          if(inp.checked) gqSelectedTags.add(inp.value); else gqSelectedTags.delete(inp.value);
+          updateTagPreview();
+        });
+      });
+    }
+    renderList('');
+    searchInput.addEventListener('input', ()=> renderList(searchInput.value));
+    setTimeout(()=> searchInput.focus(), 0);
+  }
+  refreshTags();
+  root.querySelector('#gqTagDropBtn').addEventListener('click', (e)=>{ e.stopPropagation(); openTagPanel(); });
+  document.addEventListener('click', function outsideTagClick(e){
+    const dropWrap = root.querySelector('#gqTagDrop');
+    if(!dropWrap) { document.removeEventListener('click', outsideTagClick); return; }
+    if(!dropWrap.contains(e.target)){ const p = dropWrap.querySelector('.tagdrop-panel'); if(p) p.remove(); }
+  });
+  root.querySelector('#gqSubject').addEventListener('change', refreshTags);
+  root.querySelector('#genQClose').addEventListener('click', close);
+  root.querySelector('#gqCancel').addEventListener('click', close);
+  root.querySelector('#genQOverlay').addEventListener('click', (e)=>{ if(e.target.id==='genQOverlay') close(); });
+  root.querySelector('#gqStart').addEventListener('click', ()=>{
+    const subjectId = root.querySelector('#gqSubject').value;
+    const count = parseInt(root.querySelector('#gqCount').value);
+    const selectedTags = Array.from(gqSelectedTags);
+    const matchMode = root.querySelector('input[name=gqMatch]:checked').value;
+    const mode = root.querySelector('input[name=gqMode]:checked').value;
+    if(!count || count<1){ toast('Enter a valid number of items.', 'error'); return; }
+    const result = generateQuiz(subjectId, count, selectedTags, matchMode);
+    if(result.error){ toast(result.error, 'error'); return; }
+    close();
+    startQuiz(subjectId, result.quiz, mode);
+  });
+}
+
+function generateQuiz(subjectId, desiredCount, selectedTags, matchMode){
+  const subject = state.subjects[subjectId];
+  let pool = subject.questions.slice();
+  if(selectedTags.length>0){
+    pool = pool.filter(q=>{
+      const qtags = q.tags||[];
+      return matchMode==='and' ? selectedTags.every(t=>qtags.includes(t)) : selectedTags.some(t=>qtags.includes(t));
+    });
+  }
+  if(pool.length < desiredCount){
+    return {error: `Insufficient questions. Pool has ${pool.length} item(s), but you requested ${desiredCount}. Please reduce the number or add more questions.`};
+  }
+  // Fisher-Yates shuffle
+  const shuffled = pool.slice();
+  for(let i=shuffled.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const finalQuiz = [];
+  const usedGroups = new Set();
+  for(const q of shuffled){
+    if(finalQuiz.length >= desiredCount) break;
+    if(q.type === 'single'){
+      finalQuiz.push(q);
+    } else if(q.type === 'group_child'){
+      if(usedGroups.has(q.groupId)) continue;
+      const siblings = pool.filter(x=>x.type==='group_child' && x.groupId===q.groupId);
+      const shuffledSibs = siblings.slice();
+      for(let i=shuffledSibs.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [shuffledSibs[i], shuffledSibs[j]] = [shuffledSibs[j], shuffledSibs[i]];
+      }
+      const takeCount = Math.min(3, shuffledSibs.length);
+      const taken = shuffledSibs.slice(0, takeCount);
+      finalQuiz.push(...taken);
+      usedGroups.add(q.groupId);
+    }
+  }
+  // trim to exactly desiredCount is NOT forced per spec (group activation may exceed slightly);
+  // we keep as built per algorithm (loop breaks once >= desiredCount at top of next iteration)
+
+  // Randomize option order per question
+  const finalized = finalQuiz.map(q=>{
+    const idxs = q.options.map((_,i)=>i);
+    for(let i=idxs.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
+    }
+    const newOptions = idxs.map(i=>q.options[i]);
+    const newCorrect = idxs.indexOf(q.correctAnswerIndex);
+    return Object.assign({}, q, {options:newOptions, correctAnswerIndex:newCorrect, sourceId:q.id});
+  });
+  return {quiz: finalized};
+}
+
+/* ============================= QUIZ RUNTIME ============================= */
+let quizState = null;
+function startQuiz(subjectId, quizArr, mode){
+  quizState = {
+    subjectId, mode, items: quizArr, index: 0,
+    answers: new Array(quizArr.length).fill(null),
+    checked: new Array(quizArr.length).fill(false),
+    startedAt: new Date().toISOString()
+  };
+  persistQuizState();
+  renderQuizOverlay();
+}
+function persistQuizState(){
+  try{ sessionStorage.setItem(SESSION_KEY, JSON.stringify(quizState)); }catch(e){}
+}
+function clearQuizSession(){
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+function renderQuizOverlay(animate=true){
+  const root = document.getElementById('modalRoot');
+  const q = quizState.items[quizState.index];
+  const total = quizState.items.length;
+  const pct = Math.round(((quizState.index)/total)*100);
+  const isLast = quizState.index === total-1;
+  const selected = quizState.answers[quizState.index];
+  const checked = quizState.checked[quizState.index];
+
+  const optionsHtml = (q.options||[]).map((opt,i)=>{
+    let cls = 'quiz-option';
+    if(quizState.mode==='practice' && checked){
+      if(i===q.correctAnswerIndex) cls += ' correct';
+      else if(i===selected) cls += ' incorrect';
+    } else if(selected===i){
+      cls += ' selected';
+    }
+    return `<div class="${cls}" data-opt="${i}"><div class="marker"></div><div>${renderRichText(opt)}</div><span class="opt-key">${i+1}</span></div>`;
+  }).join('');
+
+  const showCheck = quizState.mode==='practice' && !checked;
+  const showNext = quizState.mode==='exam' || (quizState.mode==='practice' && checked);
+
+  const actionsBlock = `
+    <div class="quiz-actions">
+      <button class="btn ghost" id="quizPrev" ${quizState.index===0?'disabled':''}>Previous</button>
+      <div style="display:flex; gap:8px;">
+        ${showCheck ? `<button class="btn primary" id="quizCheck">Check Answer <span class="key-hint">Enter</span></button>` : ''}
+        ${showNext ? `<button class="btn primary" id="quizNext">${isLast ? 'Finish' : 'Next'} <span class="key-hint">Enter</span></button>` : ''}
+      </div>
+    </div>
+  `;
+
+  const questionBlock = `
+    <div class="quiz-question">${renderRichText(q.questionText)}</div>
+    <div id="quizOptions">${optionsHtml}</div>
+    ${quizState.mode==='practice' && checked ? `<div class="quiz-feedback ${selected===q.correctAnswerIndex?'correct':'incorrect'}">${selected===q.correctAnswerIndex?'Correct!':'Not quite — review the highlighted answer.'}</div>` : ''}
+    ${actionsBlock}
+  `;
+
+  const fadeCls = animate ? ' quiz-fade' : '';
+  const content = q.type==='group_child' ? `
+    <div class="quiz-split${fadeCls}">
+      <div class="quiz-stimulus">${renderRichText(q.parentStimulus||'')}</div>
+      <div class="quiz-qside">${questionBlock}</div>
+    </div>
+  ` : `<div class="quiz-inner${fadeCls}">${questionBlock}</div>`;
+
+  let overlay = root.querySelector('.quiz-overlay');
+  if(!overlay){
+    root.innerHTML = `
+      <div class="quiz-overlay">
+        <div class="quiz-top">
+          <div>
+            <div class="quiz-progress" id="quizProgressText">Question ${quizState.index+1} of ${total}</div>
+            <div class="quiz-progress-bar"><div class="quiz-progress-bar-fill" id="quizProgressFill" style="width:${pct}%;"></div></div>
+          </div>
+          <button class="btn ghost" id="quizExit"><i class="fa-solid fa-xmark"></i> Exit Quiz <span class="key-hint">Esc</span></button>
+        </div>
+        <div class="quiz-content" id="quizContentWrap">${content}</div>
+      </div>`;
+  } else {
+    overlay.querySelector('#quizProgressText').textContent = `Question ${quizState.index+1} of ${total}`;
+    overlay.querySelector('#quizProgressFill').style.width = pct+'%';
+    overlay.querySelector('#quizContentWrap').innerHTML = content;
+  }
+
+  renderMath(root);
+
+  root.querySelectorAll('[data-opt]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      if(quizState.mode==='practice' && quizState.checked[quizState.index]) return;
+      quizState.answers[quizState.index] = parseInt(el.dataset.opt);
+      renderQuizOverlay(false);
+    });
+  });
+  const checkBtn = root.querySelector('#quizCheck');
+  if(checkBtn) checkBtn.addEventListener('click', ()=>{
+    if(quizState.answers[quizState.index]===null){ toast('Select an answer first.', 'error'); return; }
+    quizState.checked[quizState.index] = true;
+    persistQuizState();
+    renderQuizOverlay(false);
+  });
+  root.querySelector('#quizPrev').addEventListener('click', ()=>{
+    if(quizState.index>0){ quizState.index--; persistQuizState(); renderQuizOverlay(true); }
+  });
+  const nextBtn = root.querySelector('#quizNext');
+  if(nextBtn) nextBtn.addEventListener('click', ()=>{
+    if(isLast){
+      finishQuiz();
+    } else {
+      quizState.index++;
+      persistQuizState();
+      renderQuizOverlay(true);
+    }
+  });
+  root.querySelector('#quizExit').addEventListener('click', ()=>{
+    confirmModal('Progress will be lost. Exit?', ()=>{
+      clearQuizSession();
+      quizState = null;
+      document.getElementById('modalRoot').innerHTML='';
+      renderMain();
+    });
+  });
+}
+
+/* ============================= KEYBOARD SHORTCUTS ============================= */
+document.addEventListener('keydown', (e)=>{
+  const tag = (e.target.tagName || '').toLowerCase();
+  const isTyping = tag==='input' || tag==='textarea' || tag==='select' || e.target.isContentEditable;
+
+  // Quiz overlay shortcuts take priority whenever a quiz is active
+  const inQuiz = quizState && document.querySelector('.quiz-overlay') && !document.querySelector('.overlay');
+  if(inQuiz){
+    const idx = quizState.index;
+    const q = quizState.items[idx];
+    if(e.key >= '1' && e.key <= '5'){
+      const optIdx = parseInt(e.key)-1;
+      if(optIdx < (q.options||[]).length){
+        if(!(quizState.mode==='practice' && quizState.checked[idx])){
+          e.preventDefault();
+          quizState.answers[idx] = optIdx;
+          renderQuizOverlay(false);
+        }
+      }
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      const checkBtn = document.getElementById('quizCheck');
+      const nextBtn = document.getElementById('quizNext');
+      if(checkBtn) checkBtn.click();
+      else if(nextBtn) nextBtn.click();
+    } else if(e.key === 'ArrowLeft'){
+      e.preventDefault();
+      const prevBtn = document.getElementById('quizPrev');
+      if(prevBtn && !prevBtn.disabled) prevBtn.click();
+    } else if(e.key === 'ArrowRight'){
+      const nextBtn = document.getElementById('quizNext');
+      if(nextBtn){ e.preventDefault(); nextBtn.click(); }
+    } else if(e.key === 'Escape'){
+      e.preventDefault();
+      document.getElementById('quizExit')?.click();
+    }
+    return;
+  }
+
+  // Any modal open: only Escape is handled generically (close on backdrop already supports click)
+  if(document.querySelector('.overlay')){
+    if(e.key === 'Escape' && !isTyping){
+      const closeBtn = document.querySelector('.modal-head button, #confCancel');
+      if(closeBtn) closeBtn.click();
+    }
+    return;
+  }
+
+  if(isTyping) return;
+
+  // Global app shortcuts
+  if(e.key === '/'){
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  } else if(e.key.toLowerCase() === 'g'){
+    openGeneratorModal();
+  } else if(e.key.toLowerCase() === 'n'){
+    document.getElementById('btnAddSubject').click();
+  } else if(e.key.toLowerCase() === 'i'){
+    document.getElementById('btnImport').click();
+  } else if(e.key.toLowerCase() === 'd'){
+    toggleDarkMode();
+  }
+});
+
+let lastQuizMistakes = [];
+function finishQuiz(){
+  const subject = state.subjects[quizState.subjectId];
+  let correct = 0, wrong = 0;
+  lastQuizMistakes = [];
+  quizState.items.forEach((item, i)=>{
+    const ans = quizState.answers[i];
+    const origQ = subject.questions.find(x=>x.id===item.sourceId);
+    if(origQ){
+      origQ.tracking = origQ.tracking || {timesShown:0,timesCorrect:0,timesWrong:0,lastSeen:null};
+      origQ.tracking.timesShown++;
+      origQ.tracking.lastSeen = new Date().toISOString();
+      if(ans!==null && ans===item.correctAnswerIndex){ origQ.tracking.timesCorrect++; correct++; }
+      else { origQ.tracking.timesWrong++; wrong++; }
+    }
+    if(ans===null || ans!==item.correctAnswerIndex){
+      lastQuizMistakes.push({
+        stimulus: item.parentStimulus || null,
+        questionText: item.questionText,
+        yourAnswer: ans!==null ? item.options[ans] : null,
+        correctAnswer: item.options[item.correctAnswerIndex]
+      });
+    }
+  });
+  touchSubject(quizState.subjectId);
+  saveState();
+  clearQuizSession();
+  renderEndScreen(correct, wrong, quizState.items.length);
+}
+
+function renderEndScreen(correct, wrong, total){
+  const root = document.getElementById('modalRoot');
+  const scorePct = Math.round((correct/total)*100);
+  root.innerHTML = `
+    <div class="quiz-overlay">
+      <div class="quiz-top"><div class="quiz-progress">Quiz Complete</div><div></div></div>
+      <div class="quiz-content">
+        <div class="end-screen">
+          <i class="fa-solid fa-circle-check" style="font-size:40px; color:var(--accent);"></i>
+          <div class="end-score">${scorePct}%</div>
+          <div style="color:var(--text-secondary); font-size:14px;">${correct} correct, ${wrong} wrong out of ${total}</div>
+          <div style="display:flex; gap:8px; margin-top:16px;">
+            ${lastQuizMistakes.length ? `<button class="btn" id="quizReviewBtn"><i class="fa-solid fa-magnifying-glass"></i> Review Mistaken Questions</button>` : ''}
+            <button class="btn primary" id="quizFinishBtn">Finish</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  renderMath(root);
+  const reviewBtn = root.querySelector('#quizReviewBtn');
+  if(reviewBtn) reviewBtn.addEventListener('click', ()=> renderReviewScreen(correct, wrong, total));
+  root.querySelector('#quizFinishBtn').addEventListener('click', ()=>{
+    quizState = null;
+    root.innerHTML='';
+    renderMain();
+  });
+}
+
+function renderReviewScreen(correct, wrong, total){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="quiz-overlay">
+      <div class="quiz-top">
+        <div class="quiz-progress">Mistaken Questions (${lastQuizMistakes.length})</div>
+        <button class="btn ghost" id="reviewBack"><i class="fa-solid fa-arrow-left"></i> Back to Summary</button>
+      </div>
+      <div class="quiz-content">
+        <div class="review-list">
+          ${lastQuizMistakes.map(m=>`
+            <div class="review-item">
+              ${m.stimulus ? `<div class="rq-stimulus">${renderRichText(m.stimulus)}</div>` : ''}
+              <div class="rq-text">${renderRichText(m.questionText)}</div>
+              <div class="rq-ans wrong"><span class="lbl">Your answer:</span>${m.yourAnswer ? renderRichText(m.yourAnswer) : 'No answer'}</div>
+              <div class="rq-ans right"><span class="lbl">Correct answer:</span>${renderRichText(m.correctAnswer)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+  renderMath(root);
+  root.querySelector('#reviewBack').addEventListener('click', ()=> renderEndScreen(correct, wrong, total));
+}
+
+/* ============================= RESUME BOTTOM SHEET ============================= */
+function checkResumeQuiz(){
+  try{
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if(!raw) return;
+    const saved = JSON.parse(raw);
+    const subject = state.subjects[saved.subjectId];
+    if(!subject){ sessionStorage.removeItem(SESSION_KEY); return; }
+    // staleness check
+    if(subject.updatedAt && saved.startedAt && new Date(subject.updatedAt) > new Date(saved.startedAt)){
+      sessionStorage.removeItem(SESSION_KEY);
+      return;
+    }
+    showResumeSheet(saved);
+  }catch(e){ sessionStorage.removeItem(SESSION_KEY); }
+}
+function showResumeSheet(saved){
+  const root = document.getElementById('sheetRoot');
+  root.innerHTML = `
+    <div class="bottom-sheet">
+      <span>You have an ongoing quiz. Resume?</span>
+      <button class="resume-btn" id="sheetResume">Resume</button>
+      <button class="discard-btn" id="sheetDiscard">Discard</button>
+    </div>`;
+  root.querySelector('#sheetResume').addEventListener('click', ()=>{
+    quizState = saved;
+    root.innerHTML='';
+    renderQuizOverlay();
+  });
+  root.querySelector('#sheetDiscard').addEventListener('click', ()=>{
+    clearQuizSession();
+    root.innerHTML='';
+  });
+}
+
+/* ============================= INIT ============================= */
+function init(){
+  initDarkMode();
+  renderAll();
+  checkResumeQuiz();
+}
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
