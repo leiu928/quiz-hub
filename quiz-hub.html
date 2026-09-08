@@ -9,6 +9,9 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
@@ -86,13 +89,35 @@
   .topbar .search i{color:var(--text-faint); font-size:12px;}
   .topbar-actions{display:flex; align-items:center; gap:4px;}
   .icon-btn{
-    display:flex; align-items:center; justify-content:center; gap:6px; width:34px; height:34px; border-radius:6px;
+    position:relative; display:flex; align-items:center; justify-content:center; gap:6px; width:34px; height:34px; border-radius:6px;
     border:none; background:transparent; color:var(--text-secondary); font-size:14px; transition:background .12s;
   }
   .icon-btn:hover{background:var(--bg-tertiary); color:var(--text);}
   .icon-btn.wide{width:auto; padding:0 12px; font-size:13px; font-weight:500;}
   .icon-btn.primary{background:var(--accent); color:#fff;}
   .icon-btn.primary:hover{background:var(--accent-hover);}
+
+  .sync-dot{
+    position:absolute; top:6px; right:6px; width:7px; height:7px; border-radius:50%; border:1.5px solid var(--bg);
+    background:var(--text-faint);
+  }
+  .sync-dot.offline{background:var(--text-faint);}
+  .sync-dot.signed-out{background:var(--amber);}
+  .sync-dot.syncing{background:var(--accent); animation:pulseDot 1s ease-in-out infinite;}
+  .sync-dot.synced{background:var(--green);}
+  .sync-dot.error{background:var(--red);}
+  @keyframes pulseDot{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+  .sync-status-row{display:flex; align-items:center; gap:10px; padding:12px; background:var(--bg-secondary); border-radius:8px; margin-bottom:16px;}
+  .sync-status-row .dot-lg{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+  .sync-status-row .dot-lg.offline{background:var(--text-faint);}
+  .sync-status-row .dot-lg.signed-out{background:var(--amber);}
+  .sync-status-row .dot-lg.syncing{background:var(--accent);}
+  .sync-status-row .dot-lg.synced{background:var(--green);}
+  .sync-status-row .dot-lg.error{background:var(--red);}
+  .sync-tabs{display:flex; gap:6px; margin-bottom:4px;}
+  .sync-tabs button{flex:1; padding:7px; border-radius:6px; border:1px solid var(--border); background:var(--bg); font-size:12.5px; font-weight:600; color:var(--text-secondary);}
+  .sync-tabs button.active{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
 
   .body-row{flex:1; display:flex; min-height:0;}
   .sidebar{
@@ -366,6 +391,7 @@
       <button class="icon-btn" id="btnImportBackup" title="Import Quiz Pack"><i class="fa-solid fa-upload"></i></button>
       <button class="icon-btn wide primary" id="btnGenerate"><i class="fa-solid fa-rocket"></i> Generate Quiz</button>
       <button class="icon-btn" id="btnShortcuts" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
+      <button class="icon-btn" id="btnSync" title="Cloud sync"><i class="fa-solid fa-cloud"></i><span class="sync-dot offline"></span></button>
       <button class="icon-btn" id="btnDark" title="Toggle dark mode"><i class="fa-solid fa-moon"></i></button>
     </div>
   </div>
@@ -423,6 +449,7 @@ function saveState(){
   }catch(e){
     toast('Failed to save data: ' + e.message, 'error');
   }
+  scheduleCloudPush();
 }
 function uid(prefix){ return prefix + '-' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 function touchSubject(subjectId){
@@ -1333,7 +1360,7 @@ function freshTracking(){
   return {timesShown:0, timesCorrect:0, timesWrong:0, lastSeen:null};
 }
 function trackingFrom(q, policy){
-  if(policy === 'keep-imported' && q.tracking){
+  if((policy === 'keep-imported' || policy === 'smart-auto') && q.tracking){
     return {
       timesShown: q.tracking.timesShown||0,
       timesCorrect: q.tracking.timesCorrect||0,
@@ -1370,6 +1397,14 @@ function mergeImportedState(incomingData, policy){
           existing.tracking = trackingFrom(incomingQ, 'keep-imported');
         } else if(policy === 'reset-all'){
           existing.tracking = freshTracking();
+        } else if(policy === 'smart-auto'){
+          // Automatic background sync: whichever side has more attempts logged
+          // is treated as the more current copy of this question's progress.
+          const remoteT = incomingQ.tracking || freshTracking();
+          const localT = existing.tracking || freshTracking();
+          if((remoteT.timesShown||0) > (localT.timesShown||0)){
+            existing.tracking = trackingFrom(incomingQ, 'keep-imported');
+          }
         }
         // 'reset-new' leaves existing local progress untouched
         report.questionsMatched++;
@@ -1410,6 +1445,289 @@ function mergeImportedState(incomingData, policy){
 
   return report;
 }
+
+/* ============================= CLOUD SYNC (Firebase) ============================= */
+const FIREBASE_CONFIG_KEY = 'quizHubFirebaseConfig';
+const SYNC_COLLECTION = 'quizHubUsers';
+const PULL_INTERVAL_MS = 2 * 60 * 1000; // periodic pull every 2 minutes
+const PUSH_DEBOUNCE_MS = 3000;
+
+let firebaseApp = null, firebaseAuth = null, firestoreDb = null, currentUser = null;
+let syncStatus = 'offline'; // offline | signed-out | syncing | synced | error
+let lastSyncedAt = null;
+let lastSyncError = '';
+let pushDebounceTimer = null;
+let periodicPullTimer = null;
+let firebaseLoadRetries = 0;
+
+function getFirebaseConfig(){
+  try{ const raw = localStorage.getItem(FIREBASE_CONFIG_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function saveFirebaseConfig(cfg){ localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(cfg)); }
+function clearFirebaseConfig(){ localStorage.removeItem(FIREBASE_CONFIG_KEY); }
+
+function initFirebaseIfConfigured(){
+  const cfg = getFirebaseConfig();
+  if(!cfg){ syncStatus = 'offline'; updateSyncIndicator(); return; }
+  if(typeof firebase === 'undefined'){
+    firebaseLoadRetries++;
+    if(firebaseLoadRetries > 20){ syncStatus = 'error'; lastSyncError = 'Could not load the sync library (check your internet connection).'; updateSyncIndicator(); return; }
+    setTimeout(initFirebaseIfConfigured, 500);
+    return;
+  }
+  if(firebaseApp) return;
+  try{
+    firebaseApp = firebase.initializeApp(cfg);
+    firebaseAuth = firebase.auth();
+    firestoreDb = firebase.firestore();
+    firebaseAuth.onAuthStateChanged(user=>{
+      currentUser = user;
+      if(user){
+        syncStatus = 'synced';
+        startPeriodicPull();
+        pullAndMergeFromCloud();
+      } else {
+        syncStatus = 'signed-out';
+        stopPeriodicPull();
+      }
+      updateSyncIndicator();
+    });
+  }catch(e){
+    syncStatus = 'error';
+    lastSyncError = e.message;
+    updateSyncIndicator();
+  }
+}
+
+async function cloudSignUp(email, password){
+  return firebaseAuth.createUserWithEmailAndPassword(email, password);
+}
+async function cloudLogIn(email, password){
+  return firebaseAuth.signInWithEmailAndPassword(email, password);
+}
+async function cloudSignOut(){
+  await firebaseAuth.signOut();
+}
+
+function scheduleCloudPush(){
+  if(!currentUser || !firestoreDb) return;
+  clearTimeout(pushDebounceTimer);
+  pushDebounceTimer = setTimeout(pushToCloud, PUSH_DEBOUNCE_MS);
+}
+
+async function pushToCloud(){
+  if(!currentUser || !firestoreDb) return;
+  const json = JSON.stringify(state);
+  const sizeMB = new Blob([json]).size / (1024*1024);
+  if(sizeMB > 0.9){
+    syncStatus = 'error';
+    lastSyncError = 'Your data (' + sizeMB.toFixed(1) + 'MB) is too large for cloud sync (1MB limit). Try exporting a smaller Quiz Pack per course instead.';
+    updateSyncIndicator();
+    return;
+  }
+  syncStatus = 'syncing'; updateSyncIndicator();
+  try{
+    await firestoreDb.collection(SYNC_COLLECTION).doc(currentUser.uid).set({
+      stateJson: json,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    lastSyncedAt = new Date();
+    syncStatus = 'synced';
+  }catch(e){
+    syncStatus = 'error';
+    lastSyncError = e.message;
+  }
+  updateSyncIndicator();
+}
+
+async function pullAndMergeFromCloud(silent=true){
+  if(!currentUser || !firestoreDb) return;
+  syncStatus = 'syncing'; updateSyncIndicator();
+  try{
+    const doc = await firestoreDb.collection(SYNC_COLLECTION).doc(currentUser.uid).get();
+    if(doc.exists && doc.data().stateJson){
+      const remote = JSON.parse(doc.data().stateJson);
+      const report = mergeImportedState(remote, 'smart-auto');
+      if(report.subjectsAdded || report.questionsAdded){
+        saveState(); renderAll();
+        if(!silent) toast(`Synced: ${report.subjectsAdded} new course(s), ${report.questionsAdded} new question(s).`, 'success');
+      } else if(!silent){
+        toast('Already up to date.', 'success');
+      }
+    } else if(!silent){
+      toast('Nothing in the cloud yet — this device will push first.', 'success');
+    }
+    lastSyncedAt = new Date();
+    syncStatus = 'synced';
+    updateSyncIndicator();
+    scheduleCloudPush(); // push back in case local had things the cloud was missing
+  }catch(e){
+    syncStatus = 'error';
+    lastSyncError = e.message;
+    updateSyncIndicator();
+  }
+}
+
+function startPeriodicPull(){
+  stopPeriodicPull();
+  periodicPullTimer = setInterval(()=> pullAndMergeFromCloud(true), PULL_INTERVAL_MS);
+}
+function stopPeriodicPull(){
+  if(periodicPullTimer) clearInterval(periodicPullTimer);
+  periodicPullTimer = null;
+}
+
+function timeAgo(date){
+  if(!date) return '';
+  const secs = Math.floor((Date.now() - date.getTime())/1000);
+  if(secs < 10) return 'just now';
+  if(secs < 60) return secs + 's ago';
+  const mins = Math.floor(secs/60);
+  if(mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins/60);
+  return hrs + 'h ago';
+}
+
+function updateSyncIndicator(){
+  const btn = document.getElementById('btnSync');
+  if(!btn) return;
+  const dot = btn.querySelector('.sync-dot');
+  if(dot) dot.className = 'sync-dot ' + syncStatus;
+  const labels = {
+    offline: 'Cloud sync not set up — click to enable',
+    'signed-out': 'Cloud sync ready — click to sign in',
+    syncing: 'Syncing…',
+    synced: 'Synced' + (lastSyncedAt ? ' ' + timeAgo(lastSyncedAt) : ''),
+    error: 'Sync error — click for details'
+  };
+  btn.title = labels[syncStatus] || 'Cloud sync';
+  const openPanel = document.getElementById('syncPanelRoot');
+  if(openPanel) renderSyncModalBody();
+}
+
+/* ---- Sync modal UI ---- */
+let syncModalTab = 'login'; // 'login' | 'signup'
+function openSyncModal(){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="syOverlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Cloud Sync</h3><button id="syClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body" id="syncPanelRoot"></div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#syClose').addEventListener('click', close);
+  root.querySelector('#syOverlay').addEventListener('click', (e)=>{ if(e.target.id==='syOverlay') close(); });
+  renderSyncModalBody();
+}
+
+function renderSyncModalBody(){
+  const panel = document.getElementById('syncPanelRoot');
+  if(!panel) return;
+  const cfg = getFirebaseConfig();
+
+  if(!cfg){
+    panel.innerHTML = `
+      <div class="hint" style="margin-bottom:12px; font-size:12.5px; line-height:1.6;">
+        Cloud sync uses your own free Firebase project — your data goes only to a project you control, not to us.
+        <ol style="margin:8px 0 0 18px; padding:0;">
+          <li>Create a project at <code>console.firebase.google.com</code> (free).</li>
+          <li>Add a Web App in Project Settings, and copy the <code>firebaseConfig</code> snippet.</li>
+          <li>Enable <b>Email/Password</b> under Authentication → Sign-in method.</li>
+          <li>Create a <b>Firestore Database</b> (production mode is fine).</li>
+          <li>Under Firestore → Rules, paste:</li>
+        </ol>
+        <pre style="margin-top:8px;"><code>rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /${SYNC_COLLECTION}/{userId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+  }
+}</code></pre>
+      </div>
+      <div class="field">
+        <label>Paste your firebaseConfig object</label>
+        <textarea id="syConfigInput" style="min-height:120px; font-family:var(--font-mono); font-size:12px;" placeholder="{ apiKey: '...', authDomain: '...', projectId: '...', ... }"></textarea>
+      </div>
+      <button class="btn primary" id="sySaveConfig" style="width:100%; justify-content:center;">Save & Continue</button>
+    `;
+    panel.querySelector('#sySaveConfig').addEventListener('click', ()=>{
+      let raw = panel.querySelector('#syConfigInput').value.trim();
+      if(!raw){ toast('Paste your Firebase config first.', 'error'); return; }
+      const firstBrace = raw.indexOf('{'), lastBrace = raw.lastIndexOf('}');
+      if(firstBrace !== -1 && lastBrace > firstBrace) raw = raw.slice(firstBrace, lastBrace+1);
+      let cfgObj;
+      try{ cfgObj = Function('"use strict"; return (' + raw + ')')(); }catch(e){ toast('Could not parse that config — check it\'s valid.', 'error'); return; }
+      if(!cfgObj || !cfgObj.apiKey || !cfgObj.projectId){ toast('That doesn\'t look like a complete Firebase config.', 'error'); return; }
+      saveFirebaseConfig(cfgObj);
+      firebaseLoadRetries = 0;
+      initFirebaseIfConfigured();
+      toast('Firebase connected.', 'success');
+      renderSyncModalBody();
+    });
+    return;
+  }
+
+  if(!currentUser){
+    panel.innerHTML = `
+      <div class="sync-status-row"><span class="dot-lg ${syncStatus}"></span><span>${syncStatus==='error' ? escapeHtml(lastSyncError||'Sync error') : 'Sign in to sync across your devices'}</span></div>
+      <div class="sync-tabs">
+        <button data-tab="login" class="${syncModalTab==='login'?'active':''}">Log In</button>
+        <button data-tab="signup" class="${syncModalTab==='signup'?'active':''}">Sign Up</button>
+      </div>
+      <div class="field" style="margin-top:14px;"><label>Email</label><input type="text" id="syEmail" placeholder="you@example.com"></div>
+      <div class="field"><label>Password</label><input type="text" id="syPassword" placeholder="At least 6 characters"></div>
+      <button class="btn primary" id="syAuthBtn" style="width:100%; justify-content:center;">${syncModalTab==='login'?'Log In':'Create Account'}</button>
+      <button class="btn ghost" id="syForget" style="width:100%; justify-content:center; margin-top:8px;">Disconnect Firebase project</button>
+    `;
+    panel.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click', ()=>{ syncModalTab = b.dataset.tab; renderSyncModalBody(); }));
+    panel.querySelector('#syAuthBtn').addEventListener('click', async ()=>{
+      const email = panel.querySelector('#syEmail').value.trim();
+      const password = panel.querySelector('#syPassword').value;
+      if(!email || password.length < 6){ toast('Enter a valid email and a password of at least 6 characters.', 'error'); return; }
+      try{
+        if(syncModalTab === 'signup') await cloudSignUp(email, password);
+        else await cloudLogIn(email, password);
+        toast('Signed in.', 'success');
+        renderSyncModalBody();
+      }catch(e){
+        toast(e.message, 'error');
+      }
+    });
+    panel.querySelector('#syForget').addEventListener('click', ()=>{
+      confirmModal('Disconnect this Firebase project? You can reconnect (or connect a different one) any time.', ()=>{
+        clearFirebaseConfig();
+        firebaseApp = null; firebaseAuth = null; firestoreDb = null; currentUser = null;
+        stopPeriodicPull();
+        syncStatus = 'offline';
+        updateSyncIndicator();
+        renderSyncModalBody();
+      });
+    });
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="sync-status-row">
+      <span class="dot-lg ${syncStatus}"></span>
+      <span>${syncStatus==='error' ? escapeHtml(lastSyncError||'Sync error') : ('Signed in as ' + escapeHtml(currentUser.email) + (lastSyncedAt ? ' · synced ' + timeAgo(lastSyncedAt) : ''))}</span>
+    </div>
+    <div class="hint" style="margin-bottom:14px;">Auto-syncs after every change, and pulls from your other devices every couple of minutes.</div>
+    <button class="btn primary" id="sySyncNow" style="width:100%; justify-content:center;"><i class="fa-solid fa-rotate"></i> Sync Now</button>
+    <button class="btn ghost" id="sySignOut" style="width:100%; justify-content:center; margin-top:8px;">Sign Out</button>
+  `;
+  panel.querySelector('#sySyncNow').addEventListener('click', ()=> pullAndMergeFromCloud(false));
+  panel.querySelector('#sySignOut').addEventListener('click', async ()=>{
+    await cloudSignOut();
+    toast('Signed out.', 'success');
+    renderSyncModalBody();
+  });
+}
+
+document.getElementById('btnSync').addEventListener('click', openSyncModal);
 
 /* ============================= SEARCH ============================= */
 document.getElementById('searchInput').addEventListener('input', (e)=>{
@@ -1936,6 +2254,7 @@ function init(){
   initDarkMode();
   renderAll();
   checkResumeQuiz();
+  initFirebaseIfConfigured();
 }
 window.addEventListener('load', init);
 </script>
