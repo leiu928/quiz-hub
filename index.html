@@ -76,7 +76,7 @@
   /* ---- Layout ---- */
   .app{display:flex; flex-direction:column; height:100vh;}
   .topbar{
-    display:flex; align-items:center; gap:16px; padding:0 18px; height:52px; flex-shrink:0;
+    display:flex; align-items:center; gap:16px; padding:0 clamp(10px,3vw,18px); height:52px; flex-shrink:0;
     border-bottom:1px solid var(--border); background:var(--bg);
   }
   .topbar .logo{display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; letter-spacing:-.2px;}
@@ -142,7 +142,10 @@
   }
   .add-subject-btn:hover{background:var(--bg-tertiary); color:var(--text-secondary);}
 
-  .main{flex:1; overflow-y:auto; padding:24px 32px; min-width:0;}
+  .main{flex:1; overflow-y:auto; overflow-x:hidden; padding:24px clamp(14px,4vw,32px); min-width:0;}
+  .table-scroll{width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .sidebar-toggle{display:none; flex-shrink:0;}
+  .sidebar-backdrop{display:none;}
   .empty-state{display:flex; flex-direction:column; align-items:center; justify-content:center; height:70%; color:var(--text-faint); gap:10px; text-align:center;}
   .empty-state i{font-size:32px; color:var(--text-faint);}
 
@@ -240,7 +243,7 @@
   .modal-foot{display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--bg);}
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:5px;}
-  .field textarea, .field input[type=text], .field input[type=number]{
+  .field textarea, .field input[type=text], .field input[type=number], .field input[type=email], .field input[type=password]{
     width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); font-size:13.5px; resize:vertical;
   }
   .field textarea{min-height:64px;}
@@ -250,7 +253,7 @@
   .option-row .rm-opt{border:none; background:transparent; color:var(--text-faint); width:26px; height:26px; border-radius:5px; flex-shrink:0;}
   .option-row .rm-opt:hover{color:var(--red); background:var(--red-soft);}
   .hint{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
-  .radio-row{display:flex; gap:16px; align-items:center;}
+  .radio-row{display:flex; gap:16px; align-items:center; flex-wrap:wrap;}
   .radio-row label{display:flex; align-items:center; gap:6px; font-size:13px; font-weight:500; color:var(--text);}
 
   .tagselect{display:flex; flex-wrap:wrap; gap:6px; padding:8px; border:1px solid var(--border); border-radius:6px; max-height:120px; overflow-y:auto;}
@@ -377,27 +380,70 @@
   ::-webkit-scrollbar{width:9px; height:9px;}
   ::-webkit-scrollbar-thumb{background:var(--border); border-radius:5px;}
   ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---- More menu (mobile topbar overflow) ---- */
+  #btnMore{display:none;}
+  #moreMenuWrap .tagdrop-panel{right:0; left:auto; min-width:190px; padding:6px;}
+  #moreMenuWrap .tagdrop-panel button{
+    display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border:none; background:transparent;
+    border-radius:6px; font-size:13px; color:var(--text); text-align:left;
+  }
+  #moreMenuWrap .tagdrop-panel button:hover{background:var(--bg-secondary);}
+  #moreMenuWrap .tagdrop-panel button i{width:16px; color:var(--text-faint);}
+
+  /* ---- Responsive: phone & tablet widths ---- */
+  @media (max-width: 860px){
+    .sidebar-toggle{display:flex;}
+    .logo span.logo-text{display:none;}
+    .foldable{display:none;}
+    #btnMore{display:flex;}
+    .icon-btn.wide{padding:0 10px;}
+    .icon-btn.wide span.btn-label{display:none;}
+
+    .sidebar{
+      position:fixed; top:52px; left:0; bottom:0; width:260px; max-width:78vw; z-index:150;
+      transform:translateX(-100%); transition:transform .22s ease; box-shadow:var(--shadow);
+    }
+    .sidebar.open{transform:translateX(0);}
+    .sidebar-backdrop{
+      display:block; position:fixed; inset:52px 0 0 0; background:rgba(15,13,10,0.4); z-index:140;
+      opacity:0; pointer-events:none; transition:opacity .2s ease;
+    }
+    .sidebar-backdrop.show{opacity:1; pointer-events:auto;}
+
+    .icon-btn{width:38px; height:38px;}
+    table{font-size:12.5px;}
+    .qprev{max-width:180px;}
+  }
+  @media (min-width: 861px){
+    #sidebarBackdrop{display:none !important;}
+  }
 </style>
 </head>
 <body>
 
 <div class="app">
   <div class="topbar">
-    <div class="logo"><i class="fa-solid fa-layer-group"></i> Quiz Hub</div>
+    <button class="icon-btn sidebar-toggle" id="btnSidebarToggle" title="Courses"><i class="fa-solid fa-bars"></i></button>
+    <div class="logo"><i class="fa-solid fa-layer-group"></i> <span class="logo-text">Quiz Hub</span></div>
     <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="searchInput" placeholder="Search questions..."></div>
     <div class="topbar-actions">
-      <button class="icon-btn" id="btnImport" title="Import"><i class="fa-solid fa-file-import"></i></button>
-      <button class="icon-btn" id="btnExport" title="Export Quiz Pack"><i class="fa-solid fa-file-export"></i></button>
-      <button class="icon-btn" id="btnImportBackup" title="Import Quiz Pack"><i class="fa-solid fa-upload"></i></button>
-      <button class="icon-btn wide primary" id="btnGenerate"><i class="fa-solid fa-rocket"></i> Generate Quiz</button>
-      <button class="icon-btn" id="btnShortcuts" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
+      <button class="icon-btn foldable" id="btnImport" title="Import"><i class="fa-solid fa-file-import"></i></button>
+      <button class="icon-btn foldable" id="btnExport" title="Export Quiz Pack"><i class="fa-solid fa-file-export"></i></button>
+      <button class="icon-btn foldable" id="btnImportBackup" title="Import Quiz Pack"><i class="fa-solid fa-upload"></i></button>
+      <button class="icon-btn wide primary" id="btnGenerate" title="Generate Quiz"><i class="fa-solid fa-rocket"></i> <span class="btn-label">Generate Quiz</span></button>
+      <button class="icon-btn foldable" id="btnShortcuts" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
       <button class="icon-btn" id="btnSync" title="Cloud sync"><i class="fa-solid fa-cloud"></i><span class="sync-dot offline"></span></button>
-      <button class="icon-btn" id="btnDark" title="Toggle dark mode"><i class="fa-solid fa-moon"></i></button>
+      <button class="icon-btn foldable" id="btnDark" title="Toggle dark mode"><i class="fa-solid fa-moon"></i></button>
+      <div class="tagdrop" id="moreMenuWrap">
+        <button class="icon-btn" id="btnMore" title="More"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+      </div>
     </div>
   </div>
 
   <div class="body-row">
-    <div class="sidebar">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="sidebar" id="sidebarEl">
       <div class="sidebar-title">Subjects</div>
       <div class="subject-list" id="subjectList"></div>
       <button class="add-subject-btn" id="btnAddSubject"><i class="fa-solid fa-plus"></i> Add Subject</button>
@@ -521,6 +567,7 @@ function renderSidebar(){
       document.getElementById('searchInput').value = '';
       activeTab = 'bank';
       renderAll();
+      closeSidebarDrawer();
     });
   });
   list.querySelectorAll('[data-del]').forEach(el=>{
@@ -599,6 +646,7 @@ function renderBankTab(subject, allTags){
       <div id="tagFilterPanel" style="display:none;"></div>
     </div>
     ${qs.length===0 ? `<div class="empty-state" style="height:200px;"><i class="fa-solid fa-circle-question"></i><div>No questions match. Try importing questions or adjusting filters.</div></div>` : `
+    <div class="table-scroll">
     <table>
       <thead><tr><th style="width:36px;">#</th><th>Question</th><th style="width:200px;">Tags</th><th style="width:110px;">Type</th><th style="width:100px;">Actions</th></tr></thead>
       <tbody>
@@ -626,7 +674,8 @@ function renderBankTab(subject, allTags){
           </tr>
         `;}).join('')}
       </tbody>
-    </table>`}
+    </table>
+    </div>`}
   `;
   const panel = content.querySelector('#tagFilterPanel');
   panel.innerHTML = `<div class="tagselect" style="margin-top:8px;">${allTags.length? allTags.map(t=>`
@@ -774,6 +823,7 @@ function renderStatsTab(subject){
       </div>
     </div>` : ''}
 
+    <div class="table-scroll">
     <table>
       <thead><tr>
         <th class="${thQ.cls}" data-sort="question">Question <span class="sort-arrow">${thQ.arrow}</span></th>
@@ -797,6 +847,7 @@ function renderStatsTab(subject){
         }).join('')}
       </tbody>
     </table>
+    </div>
   `;
   content.querySelectorAll('th.sortable').forEach(th=>{
     th.addEventListener('click', ()=>{
@@ -1452,6 +1503,20 @@ const SYNC_COLLECTION = 'quizHubUsers';
 const PULL_INTERVAL_MS = 2 * 60 * 1000; // periodic pull every 2 minutes
 const PUSH_DEBOUNCE_MS = 3000;
 
+// This app's own Firebase project — baked in so new devices/visitors don't need
+// to paste a config just to sign in. It only identifies which project to talk to;
+// it is not a secret (see the Firestore security rules shown in the Sync panel,
+// which are what actually keep everyone's data private to their own account).
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBRIrd9hQCPXCjAabzq2KwkEqdg1lv_QHI",
+  authDomain: "leiu-quiz-hub.firebaseapp.com",
+  projectId: "leiu-quiz-hub",
+  storageBucket: "leiu-quiz-hub.firebasestorage.app",
+  messagingSenderId: "875140204038",
+  appId: "1:875140204038:web:871b4b710112fb96572587",
+  measurementId: "G-3FJLWDPV5X"
+};
+
 let firebaseApp = null, firebaseAuth = null, firestoreDb = null, currentUser = null;
 let syncStatus = 'offline'; // offline | signed-out | syncing | synced | error
 let lastSyncedAt = null;
@@ -1461,7 +1526,14 @@ let periodicPullTimer = null;
 let firebaseLoadRetries = 0;
 
 function getFirebaseConfig(){
-  try{ const raw = localStorage.getItem(FIREBASE_CONFIG_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  try{
+    const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return DEFAULT_FIREBASE_CONFIG;
+}
+function usingCustomConfig(){
+  return !!localStorage.getItem(FIREBASE_CONFIG_KEY);
 }
 function saveFirebaseConfig(cfg){ localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(cfg)); }
 function clearFirebaseConfig(){ localStorage.removeItem(FIREBASE_CONFIG_KEY); }
@@ -1607,7 +1679,9 @@ function updateSyncIndicator(){
 
 /* ---- Sync modal UI ---- */
 let syncModalTab = 'login'; // 'login' | 'signup'
+let syncShowCustomConfigForm = false;
 function openSyncModal(){
+  syncShowCustomConfigForm = false;
   const root = document.getElementById('modalRoot');
   root.innerHTML = `
     <div class="overlay" id="syOverlay">
@@ -1625,12 +1699,11 @@ function openSyncModal(){
 function renderSyncModalBody(){
   const panel = document.getElementById('syncPanelRoot');
   if(!panel) return;
-  const cfg = getFirebaseConfig();
 
-  if(!cfg){
+  if(syncShowCustomConfigForm){
     panel.innerHTML = `
       <div class="hint" style="margin-bottom:12px; font-size:12.5px; line-height:1.6;">
-        Cloud sync uses your own free Firebase project — your data goes only to a project you control, not to us.
+        This connects to a different Firebase project instead of this app's default one. Only do this if you're running your own copy of Quiz Hub.
         <ol style="margin:8px 0 0 18px; padding:0;">
           <li>Create a project at <code>console.firebase.google.com</code> (free).</li>
           <li>Add a Web App in Project Settings, and copy the <code>firebaseConfig</code> snippet.</li>
@@ -1653,7 +1726,12 @@ service cloud.firestore {
         <textarea id="syConfigInput" style="min-height:120px; font-family:var(--font-mono); font-size:12px;" placeholder="{ apiKey: '...', authDomain: '...', projectId: '...', ... }"></textarea>
       </div>
       <button class="btn primary" id="sySaveConfig" style="width:100%; justify-content:center;">Save & Continue</button>
+      <button class="btn ghost" id="syCancelCustom" style="width:100%; justify-content:center; margin-top:8px;">Cancel</button>
     `;
+    panel.querySelector('#syCancelCustom').addEventListener('click', ()=>{
+      syncShowCustomConfigForm = false;
+      renderSyncModalBody();
+    });
     panel.querySelector('#sySaveConfig').addEventListener('click', ()=>{
       let raw = panel.querySelector('#syConfigInput').value.trim();
       if(!raw){ toast('Paste your Firebase config first.', 'error'); return; }
@@ -1663,25 +1741,31 @@ service cloud.firestore {
       try{ cfgObj = Function('"use strict"; return (' + raw + ')')(); }catch(e){ toast('Could not parse that config — check it\'s valid.', 'error'); return; }
       if(!cfgObj || !cfgObj.apiKey || !cfgObj.projectId){ toast('That doesn\'t look like a complete Firebase config.', 'error'); return; }
       saveFirebaseConfig(cfgObj);
+      firebaseApp = null; firebaseAuth = null; firestoreDb = null; currentUser = null;
+      stopPeriodicPull();
       firebaseLoadRetries = 0;
+      syncShowCustomConfigForm = false;
       initFirebaseIfConfigured();
-      toast('Firebase connected.', 'success');
+      toast('Connected to your Firebase project.', 'success');
       renderSyncModalBody();
     });
     return;
   }
 
   if(!currentUser){
+    const customNote = usingCustomConfig()
+      ? `<button class="btn ghost" id="syResetDefault" style="width:100%; justify-content:center; margin-top:8px;">Using a custom project — reset to default</button>`
+      : `<button class="btn ghost" id="syUseCustom" style="width:100%; justify-content:center; margin-top:8px; font-size:12px; color:var(--text-faint);">Advanced: use a different Firebase project</button>`;
     panel.innerHTML = `
       <div class="sync-status-row"><span class="dot-lg ${syncStatus}"></span><span>${syncStatus==='error' ? escapeHtml(lastSyncError||'Sync error') : 'Sign in to sync across your devices'}</span></div>
       <div class="sync-tabs">
         <button data-tab="login" class="${syncModalTab==='login'?'active':''}">Log In</button>
         <button data-tab="signup" class="${syncModalTab==='signup'?'active':''}">Sign Up</button>
       </div>
-      <div class="field" style="margin-top:14px;"><label>Email</label><input type="text" id="syEmail" placeholder="you@example.com"></div>
-      <div class="field"><label>Password</label><input type="text" id="syPassword" placeholder="At least 6 characters"></div>
+      <div class="field" style="margin-top:14px;"><label>Email</label><input type="email" id="syEmail" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="field"><label>Password</label><input type="password" id="syPassword" placeholder="At least 6 characters" autocomplete="current-password"></div>
       <button class="btn primary" id="syAuthBtn" style="width:100%; justify-content:center;">${syncModalTab==='login'?'Log In':'Create Account'}</button>
-      <button class="btn ghost" id="syForget" style="width:100%; justify-content:center; margin-top:8px;">Disconnect Firebase project</button>
+      ${customNote}
     `;
     panel.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click', ()=>{ syncModalTab = b.dataset.tab; renderSyncModalBody(); }));
     panel.querySelector('#syAuthBtn').addEventListener('click', async ()=>{
@@ -1697,13 +1781,17 @@ service cloud.firestore {
         toast(e.message, 'error');
       }
     });
-    panel.querySelector('#syForget').addEventListener('click', ()=>{
-      confirmModal('Disconnect this Firebase project? You can reconnect (or connect a different one) any time.', ()=>{
+    const useCustomBtn = panel.querySelector('#syUseCustom');
+    if(useCustomBtn) useCustomBtn.addEventListener('click', ()=>{ syncShowCustomConfigForm = true; renderSyncModalBody(); });
+    const resetBtn = panel.querySelector('#syResetDefault');
+    if(resetBtn) resetBtn.addEventListener('click', ()=>{
+      confirmModal('Switch back to this app\'s default Firebase project? You\'ll need to sign in again.', ()=>{
         clearFirebaseConfig();
         firebaseApp = null; firebaseAuth = null; firestoreDb = null; currentUser = null;
         stopPeriodicPull();
+        firebaseLoadRetries = 0;
         syncStatus = 'offline';
-        updateSyncIndicator();
+        initFirebaseIfConfigured();
         renderSyncModalBody();
       });
     });
@@ -1736,6 +1824,51 @@ document.getElementById('searchInput').addEventListener('input', (e)=>{
 });
 
 /* ============================= DARK MODE BUTTON ============================= */
+/* ============================= MOBILE: SIDEBAR DRAWER & MORE MENU ============================= */
+function openSidebarDrawer(){
+  document.getElementById('sidebarEl').classList.add('open');
+  document.getElementById('sidebarBackdrop').classList.add('show');
+}
+function closeSidebarDrawer(){
+  document.getElementById('sidebarEl').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('show');
+}
+document.getElementById('btnSidebarToggle').addEventListener('click', ()=>{
+  const el = document.getElementById('sidebarEl');
+  el.classList.contains('open') ? closeSidebarDrawer() : openSidebarDrawer();
+});
+document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebarDrawer);
+
+const MORE_MENU_ITEMS = [
+  {id:'btnImport', icon:'fa-file-import', label:'Import'},
+  {id:'btnExport', icon:'fa-file-export', label:'Export Quiz Pack'},
+  {id:'btnImportBackup', icon:'fa-upload', label:'Import Quiz Pack'},
+  {id:'btnShortcuts', icon:'fa-keyboard', label:'Keyboard Shortcuts'},
+  {id:'btnDark', icon:'fa-moon', label:'Toggle Dark Mode'}
+];
+document.getElementById('btnMore').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  const wrap = document.getElementById('moreMenuWrap');
+  const existing = wrap.querySelector('.tagdrop-panel');
+  if(existing){ existing.remove(); return; }
+  const panel = document.createElement('div');
+  panel.className = 'tagdrop-panel';
+  panel.innerHTML = MORE_MENU_ITEMS.map(item=>`
+    <button data-target="${item.id}"><i class="fa-solid ${item.icon}"></i> ${item.label}</button>
+  `).join('');
+  wrap.appendChild(panel);
+  panel.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      panel.remove();
+      document.getElementById(b.dataset.target).click();
+    });
+  });
+});
+document.addEventListener('click', (e)=>{
+  const wrap = document.getElementById('moreMenuWrap');
+  if(!wrap.contains(e.target)){ const p = wrap.querySelector('.tagdrop-panel'); if(p) p.remove(); }
+});
+
 document.getElementById('btnDark').addEventListener('click', toggleDarkMode);
 document.getElementById('btnShortcuts').addEventListener('click', openShortcutsModal);
 function openShortcutsModal(){
