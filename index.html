@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quiz Hub</title>
+<title>Leiu's Quiz Hub</title>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -59,12 +59,16 @@
   body{
     margin:0; font-family:var(--font-ui); background:var(--bg); color:var(--text);
     height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased;
-    transition: background-color .25s ease, color .25s ease;
+    color-scheme: light;
   }
-  body, .topbar, .sidebar, .main, .modal, .quiz-overlay, .quiz-stimulus, .quiz-option,
-  table, td, th, .subject-item, .icon-btn, .btn, .search, .select-input, .text-input,
-  .field textarea, .field input, .tagselect, .pill, .type-badge, .bottom-sheet, .tagdrop-panel{
-    transition: background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease;
+  body.dark-mode{ color-scheme: dark; }
+  /* Dark-mode transition is scoped to top-level chrome and bounded-count UI only —
+     applying it to every table cell/pill/badge (unbounded count) caused visible
+     jank when toggling on a subject with a large question bank. */
+  body, .topbar, .sidebar, .modal, .quiz-overlay, .quiz-stimulus, .quiz-option,
+  .icon-btn, .btn, .search, .select-input, .text-input,
+  .field textarea, .field input, .tagselect, .bottom-sheet, .tagdrop-panel{
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
   }
   @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
   @keyframes fadeScaleIn{ from{opacity:0; transform:translateY(6px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);} }
@@ -329,6 +333,9 @@
     border-radius:8px; padding:12px 14px; overflow-x:auto; margin:10px 0; line-height:1.55;
   }
   pre code{background:none; border:none; padding:0; font-size:inherit;}
+  /* KaTeX doesn't set its own text color, but be explicit so rendered math always
+     tracks the theme instead of any browser/user-agent default. */
+  .katex{color:inherit;}
   .rq-stimulus pre, .rq-stimulus code, .quiz-stimulus pre, .quiz-stimulus code{font-size:12px;}
   .quiz-option{
     display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border:1px solid var(--border); border-radius:8px;
@@ -414,6 +421,15 @@
     .icon-btn{width:38px; height:38px;}
     table{font-size:12.5px;}
     .qprev{max-width:180px;}
+
+    /* iOS Safari auto-zooms the viewport when focusing any input/textarea under
+       16px font-size — disorienting inside a modal and a common cause of forms
+       (like sign-in) feeling broken or mis-tappable on phones. */
+    .field textarea, .field input[type=text], .field input[type=number],
+    .field input[type=email], .field input[type=password], .select-input, .text-input,
+    .topbar .search input{
+      font-size:16px;
+    }
   }
   @media (min-width: 861px){
     #sidebarBackdrop{display:none !important;}
@@ -425,9 +441,10 @@
 <div class="app">
   <div class="topbar">
     <button class="icon-btn sidebar-toggle" id="btnSidebarToggle" title="Courses"><i class="fa-solid fa-bars"></i></button>
-    <div class="logo"><i class="fa-solid fa-layer-group"></i> <span class="logo-text">Quiz Hub</span></div>
+    <div class="logo"><i class="fa-solid fa-layer-group"></i> <span class="logo-text">Leiu's Quiz Hub</span></div>
     <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="searchInput" placeholder="Search questions..."></div>
     <div class="topbar-actions">
+      <button class="icon-btn foldable" id="btnInfo" title="About this app"><i class="fa-solid fa-circle-info"></i></button>
       <button class="icon-btn foldable" id="btnImport" title="Import"><i class="fa-solid fa-file-import"></i></button>
       <button class="icon-btn foldable" id="btnExport" title="Export Quiz Pack"><i class="fa-solid fa-file-export"></i></button>
       <button class="icon-btn foldable" id="btnImportBackup" title="Import Quiz Pack"><i class="fa-solid fa-upload"></i></button>
@@ -1498,7 +1515,6 @@ function mergeImportedState(incomingData, policy){
 }
 
 /* ============================= CLOUD SYNC (Firebase) ============================= */
-const FIREBASE_CONFIG_KEY = 'quizHubFirebaseConfig';
 const SYNC_COLLECTION = 'quizHubUsers';
 const PULL_INTERVAL_MS = 2 * 60 * 1000; // periodic pull every 2 minutes
 const PUSH_DEBOUNCE_MS = 3000;
@@ -1526,18 +1542,8 @@ let periodicPullTimer = null;
 let firebaseLoadRetries = 0;
 
 function getFirebaseConfig(){
-  try{
-    const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
-    if(raw) return JSON.parse(raw);
-  }catch(e){}
   return DEFAULT_FIREBASE_CONFIG;
 }
-function usingCustomConfig(){
-  return !!localStorage.getItem(FIREBASE_CONFIG_KEY);
-}
-function saveFirebaseConfig(cfg){ localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(cfg)); }
-function clearFirebaseConfig(){ localStorage.removeItem(FIREBASE_CONFIG_KEY); }
-
 function initFirebaseIfConfigured(){
   const cfg = getFirebaseConfig();
   if(!cfg){ syncStatus = 'offline'; updateSyncIndicator(); return; }
@@ -1551,6 +1557,14 @@ function initFirebaseIfConfigured(){
   try{
     firebaseApp = firebase.initializeApp(cfg);
     firebaseAuth = firebase.auth();
+    // Some mobile browsers (notably Safari private mode, or with strict tracking
+    // protections) block IndexedDB, which LOCAL persistence needs — without a
+    // fallback the SDK can fail silently and sign-in never completes. Degrade
+    // gracefully instead of leaving the user stuck with no feedback.
+    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+      .catch(()=> firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION))
+      .catch(()=> firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.NONE))
+      .catch(()=>{});
     firestoreDb = firebase.firestore();
     firebaseAuth.onAuthStateChanged(user=>{
       currentUser = user;
@@ -1568,6 +1582,7 @@ function initFirebaseIfConfigured(){
     syncStatus = 'error';
     lastSyncError = e.message;
     updateSyncIndicator();
+    toast('Cloud sync failed to start: ' + e.message, 'error');
   }
 }
 
@@ -1679,9 +1694,7 @@ function updateSyncIndicator(){
 
 /* ---- Sync modal UI ---- */
 let syncModalTab = 'login'; // 'login' | 'signup'
-let syncShowCustomConfigForm = false;
 function openSyncModal(){
-  syncShowCustomConfigForm = false;
   const root = document.getElementById('modalRoot');
   root.innerHTML = `
     <div class="overlay" id="syOverlay">
@@ -1700,62 +1713,7 @@ function renderSyncModalBody(){
   const panel = document.getElementById('syncPanelRoot');
   if(!panel) return;
 
-  if(syncShowCustomConfigForm){
-    panel.innerHTML = `
-      <div class="hint" style="margin-bottom:12px; font-size:12.5px; line-height:1.6;">
-        This connects to a different Firebase project instead of this app's default one. Only do this if you're running your own copy of Quiz Hub.
-        <ol style="margin:8px 0 0 18px; padding:0;">
-          <li>Create a project at <code>console.firebase.google.com</code> (free).</li>
-          <li>Add a Web App in Project Settings, and copy the <code>firebaseConfig</code> snippet.</li>
-          <li>Enable <b>Email/Password</b> under Authentication → Sign-in method.</li>
-          <li>Create a <b>Firestore Database</b> (production mode is fine).</li>
-          <li>Under Firestore → Rules, paste:</li>
-        </ol>
-        <pre style="margin-top:8px;"><code>rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /${SYNC_COLLECTION}/{userId} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId;
-    }
-  }
-}</code></pre>
-      </div>
-      <div class="field">
-        <label>Paste your firebaseConfig object</label>
-        <textarea id="syConfigInput" style="min-height:120px; font-family:var(--font-mono); font-size:12px;" placeholder="{ apiKey: '...', authDomain: '...', projectId: '...', ... }"></textarea>
-      </div>
-      <button class="btn primary" id="sySaveConfig" style="width:100%; justify-content:center;">Save & Continue</button>
-      <button class="btn ghost" id="syCancelCustom" style="width:100%; justify-content:center; margin-top:8px;">Cancel</button>
-    `;
-    panel.querySelector('#syCancelCustom').addEventListener('click', ()=>{
-      syncShowCustomConfigForm = false;
-      renderSyncModalBody();
-    });
-    panel.querySelector('#sySaveConfig').addEventListener('click', ()=>{
-      let raw = panel.querySelector('#syConfigInput').value.trim();
-      if(!raw){ toast('Paste your Firebase config first.', 'error'); return; }
-      const firstBrace = raw.indexOf('{'), lastBrace = raw.lastIndexOf('}');
-      if(firstBrace !== -1 && lastBrace > firstBrace) raw = raw.slice(firstBrace, lastBrace+1);
-      let cfgObj;
-      try{ cfgObj = Function('"use strict"; return (' + raw + ')')(); }catch(e){ toast('Could not parse that config — check it\'s valid.', 'error'); return; }
-      if(!cfgObj || !cfgObj.apiKey || !cfgObj.projectId){ toast('That doesn\'t look like a complete Firebase config.', 'error'); return; }
-      saveFirebaseConfig(cfgObj);
-      firebaseApp = null; firebaseAuth = null; firestoreDb = null; currentUser = null;
-      stopPeriodicPull();
-      firebaseLoadRetries = 0;
-      syncShowCustomConfigForm = false;
-      initFirebaseIfConfigured();
-      toast('Connected to your Firebase project.', 'success');
-      renderSyncModalBody();
-    });
-    return;
-  }
-
   if(!currentUser){
-    const customNote = usingCustomConfig()
-      ? `<button class="btn ghost" id="syResetDefault" style="width:100%; justify-content:center; margin-top:8px;">Using a custom project — reset to default</button>`
-      : `<button class="btn ghost" id="syUseCustom" style="width:100%; justify-content:center; margin-top:8px; font-size:12px; color:var(--text-faint);">Advanced: use a different Firebase project</button>`;
     panel.innerHTML = `
       <div class="sync-status-row"><span class="dot-lg ${syncStatus}"></span><span>${syncStatus==='error' ? escapeHtml(lastSyncError||'Sync error') : 'Sign in to sync across your devices'}</span></div>
       <div class="sync-tabs">
@@ -1765,35 +1723,26 @@ service cloud.firestore {
       <div class="field" style="margin-top:14px;"><label>Email</label><input type="email" id="syEmail" placeholder="you@example.com" autocomplete="email"></div>
       <div class="field"><label>Password</label><input type="password" id="syPassword" placeholder="At least 6 characters" autocomplete="current-password"></div>
       <button class="btn primary" id="syAuthBtn" style="width:100%; justify-content:center;">${syncModalTab==='login'?'Log In':'Create Account'}</button>
-      ${customNote}
     `;
     panel.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click', ()=>{ syncModalTab = b.dataset.tab; renderSyncModalBody(); }));
     panel.querySelector('#syAuthBtn').addEventListener('click', async ()=>{
       const email = panel.querySelector('#syEmail').value.trim();
       const password = panel.querySelector('#syPassword').value;
       if(!email || password.length < 6){ toast('Enter a valid email and a password of at least 6 characters.', 'error'); return; }
+      if(!firebaseAuth){ toast('Still connecting to the sync service — wait a moment and try again.', 'error'); return; }
+      const btn = panel.querySelector('#syAuthBtn');
+      const originalLabel = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Please wait…';
+      const timeout = new Promise((_, reject)=> setTimeout(()=> reject(new Error('This is taking longer than expected — check your connection and try again.')), 12000));
       try{
-        if(syncModalTab === 'signup') await cloudSignUp(email, password);
-        else await cloudLogIn(email, password);
+        if(syncModalTab === 'signup') await Promise.race([cloudSignUp(email, password), timeout]);
+        else await Promise.race([cloudLogIn(email, password), timeout]);
         toast('Signed in.', 'success');
         renderSyncModalBody();
       }catch(e){
         toast(e.message, 'error');
+        btn.disabled = false; btn.textContent = originalLabel;
       }
-    });
-    const useCustomBtn = panel.querySelector('#syUseCustom');
-    if(useCustomBtn) useCustomBtn.addEventListener('click', ()=>{ syncShowCustomConfigForm = true; renderSyncModalBody(); });
-    const resetBtn = panel.querySelector('#syResetDefault');
-    if(resetBtn) resetBtn.addEventListener('click', ()=>{
-      confirmModal('Switch back to this app\'s default Firebase project? You\'ll need to sign in again.', ()=>{
-        clearFirebaseConfig();
-        firebaseApp = null; firebaseAuth = null; firestoreDb = null; currentUser = null;
-        stopPeriodicPull();
-        firebaseLoadRetries = 0;
-        syncStatus = 'offline';
-        initFirebaseIfConfigured();
-        renderSyncModalBody();
-      });
     });
     return;
   }
@@ -1840,6 +1789,7 @@ document.getElementById('btnSidebarToggle').addEventListener('click', ()=>{
 document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebarDrawer);
 
 const MORE_MENU_ITEMS = [
+  {id:'btnInfo', icon:'fa-circle-info', label:'About This App'},
   {id:'btnImport', icon:'fa-file-import', label:'Import'},
   {id:'btnExport', icon:'fa-file-export', label:'Export Quiz Pack'},
   {id:'btnImportBackup', icon:'fa-upload', label:'Import Quiz Pack'},
@@ -1871,6 +1821,67 @@ document.addEventListener('click', (e)=>{
 
 document.getElementById('btnDark').addEventListener('click', toggleDarkMode);
 document.getElementById('btnShortcuts').addEventListener('click', openShortcutsModal);
+
+/* ============================= INFO / ABOUT MODAL ============================= */
+let infoModalTab = 'rationale'; // 'rationale' | 'guide'
+document.getElementById('btnInfo').addEventListener('click', openInfoModal);
+function openInfoModal(){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="overlay" id="infoOverlay">
+      <div class="modal">
+        <div class="modal-head"><h3>About This App</h3><button id="infoClose"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-body">
+          <div class="sync-tabs" style="margin-bottom:16px;">
+            <button data-tab="rationale" class="${infoModalTab==='rationale'?'active':''}">Rationale</button>
+            <button data-tab="guide" class="${infoModalTab==='guide'?'active':''}">Guide</button>
+          </div>
+          <div id="infoTabBody"></div>
+        </div>
+      </div>
+    </div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  root.querySelector('#infoClose').addEventListener('click', close);
+  root.querySelector('#infoOverlay').addEventListener('click', (e)=>{ if(e.target.id==='infoOverlay') close(); });
+  root.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click', ()=>{ infoModalTab = b.dataset.tab; renderInfoTabBody(); }));
+  renderInfoTabBody();
+}
+function renderInfoTabBody(){
+  const body = document.getElementById('infoTabBody');
+  if(!body) return;
+  const tabsEl = body.parentElement.querySelectorAll('[data-tab]');
+  tabsEl.forEach(b=> b.classList.toggle('active', b.dataset.tab === infoModalTab));
+
+  if(infoModalTab === 'rationale'){
+    body.innerHTML = `
+      <div class="hint" style="font-size:13px; line-height:1.7;">
+        <p>Leiu's Quiz Hub started as a personal practice tool for reviewing course material — built because most flashcard and quiz apps don't handle the way CS coursework actually looks: code snippets, math notation, and multi-part case questions built around a shared passage.</p>
+        <p>A few things it's specifically trying to get right:</p>
+        <ul style="margin:0 0 12px 18px; padding:0;">
+          <li>Questions live in one organized place per course, not scattered across notes or flashcard decks.</li>
+          <li>Reviewers can include real code blocks and LaTeX math, since plain text alone doesn't cut it for CS material.</li>
+          <li>The mastery breakdown and priority scoring exist so review time goes toward what's actually weak, not just whatever question comes up next.</li>
+          <li>It works anywhere — on a laptop while building the reviewer, on a phone while waiting in line — without installing anything.</li>
+        </ul>
+        <p>It's a work in progress, shaped by whatever turns out to actually be useful while studying.</p>
+      </div>
+    `;
+  } else {
+    body.innerHTML = `
+      <div class="hint" style="font-size:13px; line-height:1.7;">
+        <ol style="margin:0 0 4px 18px; padding:0;">
+          <li><b>Add a course</b> — use "Add Subject" in the sidebar for each course or topic you're reviewing.</li>
+          <li><b>Add questions</b> — paste a batch using Import (Type/Question/Options/Answer/Tags format), or add/edit them one at a time from the Bank tab.</li>
+          <li><b>Generate a quiz</b> — pick a course, filter by tags if you want, choose how many questions, and pick Practice (instant feedback) or Exam (scored at the end) mode.</li>
+          <li><b>Check your Statistics tab</b> — see overall accuracy, a mastery breakdown, and a sortable table to spot what needs more review.</li>
+          <li><b>Turn on Cloud Sync</b> — sign in with the same account on your other devices to keep questions and progress in sync automatically.</li>
+          <li><b>Export a Quiz Pack</b> — share a course with someone else, or back it up, from the export options (choose which courses, and whether to include your progress).</li>
+        </ol>
+      </div>
+    `;
+  }
+}
+
 function openShortcutsModal(){
   const root = document.getElementById('modalRoot');
   const rows = [
